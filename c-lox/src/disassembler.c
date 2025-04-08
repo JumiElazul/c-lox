@@ -30,6 +30,12 @@ static int constant_instruction(const char* name, bytecode_chunk* chunk, int off
 int disassemble_instruction(bytecode_chunk* chunk, int offset) {
     printf("%06d ", offset);
 
+    if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
+        printf("     | ");
+    } else {
+        printf("%6d ", chunk->lines[offset]);
+    }
+
     uint8_t instruction = chunk->code[offset];
     switch (instruction) {
         case OP_CONSTANT: {
