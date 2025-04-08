@@ -8,6 +8,8 @@ set(SOURCES
     "src/disassembler.c"
     "src/memory.h"
     "src/memory.c"
+    "src/value.h"
+    "src/value.c"
 )
 
 add_executable(c-lox ${SOURCES})
