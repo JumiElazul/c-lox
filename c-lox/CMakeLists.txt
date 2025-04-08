@@ -1,9 +1,9 @@
 set(SOURCES
     "src/main.c"
+    "src/common.h"
+
+    "src/bytecode_chunk.h"
+    "src/bytecode_chunk.c"
 )
 
-set(HEADERS
-
-)
-
-add_executable(c-lox ${SOURCES} ${HEADERS})
+add_executable(c-lox ${SOURCES})

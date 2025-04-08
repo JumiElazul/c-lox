@@ -1,0 +1,15 @@
+#ifndef JUMI_CLOX_BYTECODE_CHUNK_H
+#define JUMI_CLOX_BYTECODE_CHUNK_H
+#include "common.h"
+
+typedef enum {
+    OP_RETURN,
+} opcode;
+
+typedef struct {
+    int count;
+    int capacity;
+    uint8_t* code;
+} bytecode_chunk;
+
+#endif
