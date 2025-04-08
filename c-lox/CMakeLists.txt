@@ -4,6 +4,10 @@ set(SOURCES
 
     "src/bytecode_chunk.h"
     "src/bytecode_chunk.c"
+    "src/disassembler.h"
+    "src/disassembler.c"
+    "src/memory.h"
+    "src/memory.c"
 )
 
 add_executable(c-lox ${SOURCES})
