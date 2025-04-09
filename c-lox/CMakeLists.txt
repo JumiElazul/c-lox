@@ -10,6 +10,8 @@ set(SOURCES
     "src/memory.c"
     "src/value.h"
     "src/value.c"
+    "src/virtual_machine.h"
+    "src/virtual_machine.c"
 )
 
 add_executable(c-lox ${SOURCES})
