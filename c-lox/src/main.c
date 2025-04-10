@@ -5,6 +5,7 @@
 
 static void run_repl(void) {
     // This could be improved by not hard coding a line length limit.
+    printf("clox repl mode ('q' or 'quit' to quit)\n");
     char line[1024];
     for (;;) {
         printf("clox > ");
@@ -13,9 +14,15 @@ static void run_repl(void) {
             printf("\n");
             break;
         }
-    }
 
-    virtual_machine_interpret(line);
+        line[strcspn(line, "\n")] = '\0';
+
+        if (strcmp(line, "q") == 0 || strcmp(line, "quit") == 0) {
+            return;
+        }
+
+        virtual_machine_interpret(line);
+    }
 }
 
 static char* read_file(const char* filepath) {
@@ -71,6 +78,7 @@ int main(int argc, const char* argv[]) {
         run_file(argv[1]);
     } else {
         fprintf(stderr, "usage: clox [path]\n");
+        fprintf(stderr, "not providing path will run in repl mode\n");
         exit(EXIT_FAILURE);
     }
 

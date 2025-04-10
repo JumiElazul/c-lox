@@ -8,6 +8,8 @@ set(SOURCES
     "src/compiler.c"
     "src/disassembler.h"
     "src/disassembler.c"
+    "src/lexer.h"
+    "src/lexer.c"
     "src/memory.h"
     "src/memory.c"
     "src/value.h"
