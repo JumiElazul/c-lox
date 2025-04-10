@@ -20,10 +20,16 @@ void free_virtual_machine(void) {
 static interpret_result virtual_machine_run(void) {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.current_chunk->constants.values[READ_BYTE()])
+#define BINARY_OP(op)                           \
+    do {                                        \
+        double b = virtual_machine_stack_pop(); \
+        double a = virtual_machine_stack_pop(); \
+        virtual_machine_stack_push(a op b);     \
+    } while (false)
 
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
-        printf("        ");
+        printf("stack:  ");
         for (value* slot = vm.stack; slot < vm.stack_top; ++slot) {
             printf("[");
             print_value(*slot);
@@ -38,7 +44,21 @@ static interpret_result virtual_machine_run(void) {
             case OP_CONSTANT: {
                 value constant = READ_CONSTANT();
                 virtual_machine_stack_push(constant);
-                printf("\n");
+            } break;
+            case OP_ADD: {
+                BINARY_OP(+);
+            } break;
+            case OP_SUBTRACT: {
+                BINARY_OP(-);
+            } break;
+            case OP_MULTIPLY: {
+                BINARY_OP(*);
+            } break;
+            case OP_DIVIDE: {
+                BINARY_OP(/);
+            } break;
+            case OP_NEGATE: {
+                virtual_machine_stack_push(-virtual_machine_stack_pop());
             } break;
             case OP_RETURN: {
                 print_value(virtual_machine_stack_pop());
