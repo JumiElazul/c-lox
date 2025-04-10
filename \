@@ -16,10 +16,6 @@ void init_lexer(const char* source) {
     lex.line = 1;
 }
 
-static bool is_digit(char c) {
-    return c >= '0' && c <= '9';
-}
-
 // We ensure that our incoming source string is always null-terminated
 // to make sure that this function works correctly.
 static bool is_at_end(void) {
@@ -99,26 +95,6 @@ static void skip_whitespace(void) {
     }
 }
 
-static token make_number(void) {
-    // Advance until we find a non digit
-    while (is_digit(peek_current_char())) {
-        advance_lexer();
-    }
-
-    // Look for the fractional part '.'
-    if (peek_current_char() == '.' && is_digit(peek_next_char())) {
-        // Consume the dot character
-        advance_lexer();
-
-        while (is_digit(peek_current_char())) {
-            // Advance until we find a non-digit char
-            advance_lexer();
-        }
-    }
-
-    return make_token(TOKEN_NUMBER);
-}
-
 static token make_string(void) {
     // We eat characters, including newlines (making sure to increment the line number when we
     // find those), until we either reach the end of the file, where the string is considered 
@@ -150,10 +126,6 @@ token scan_token(void) {
 
     // Advance the lexer by one character to start
     char c = advance_lexer();
-
-    if (is_digit(c)) {
-        return make_number();
-    }
 
     switch (c) {
         case '(': return make_token(TOKEN_LEFT_PAREN);
