@@ -1,5 +1,6 @@
 #include "virtual_machine.h"
 #include "bytecode_chunk.h"
+#include "compiler.h"
 #include "disassembler.h"
 #include <stdio.h>
 
@@ -72,10 +73,9 @@ static interpret_result virtual_machine_run(void) {
 #undef READ_CONSTANT
 }
 
-interpret_result virtual_machine_interpret(bytecode_chunk* chunk) {
-    vm.current_chunk = chunk;
-    vm.ip = vm.current_chunk->code;
-    return virtual_machine_run();
+interpret_result virtual_machine_interpret(const char* source) {
+    compile(source);
+    return INTERPRET_OK;
 }
 
 void virtual_machine_stack_push(value val) {

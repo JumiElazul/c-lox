@@ -4,6 +4,8 @@ set(SOURCES
 
     "src/bytecode_chunk.h"
     "src/bytecode_chunk.c"
+    "src/compiler.h"
+    "src/compiler.c"
     "src/disassembler.h"
     "src/disassembler.c"
     "src/memory.h"

@@ -21,7 +21,7 @@ typedef enum interpret_result {
 
 void init_virtual_machine(void);
 void free_virtual_machine(void);
-interpret_result virtual_machine_interpret(bytecode_chunk* chunk);
+interpret_result virtual_machine_interpret(const char* source);
 void virtual_machine_stack_push(value val);
 value virtual_machine_stack_pop(void);
 
