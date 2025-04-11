@@ -74,8 +74,20 @@ static interpret_result virtual_machine_run(void) {
 }
 
 interpret_result virtual_machine_interpret(const char* source) {
-    compile(source);
-    return INTERPRET_OK;
+    bytecode_chunk chunk;
+    init_bytecode_chunk(&chunk);
+
+    if (!compile(source, &chunk)) {
+        free_bytecode_chunk(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    vm.current_chunk = &chunk;
+    vm.ip = vm.current_chunk->code;
+
+    interpret_result result = virtual_machine_run();
+    free_bytecode_chunk(&chunk);
+    return result;
 }
 
 void virtual_machine_stack_push(value val) {
