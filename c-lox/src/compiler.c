@@ -71,6 +71,20 @@ static void emit_byte(uint8_t byte) {
     write_to_bytecode_chunk(current_chunk(), byte, parser.previous.line);
 }
 
+static void emit_bytes(uint8_t* bytes, uint8_t n) {
+    for (uint8_t i = 0; i < n; ++i) {
+        emit_byte(bytes[i]);
+    }
+}
+
+static void emit_return(void) {
+    emit_byte(OP_RETURN);
+}
+
+static void end_compiler(void) {
+    emit_return();
+}
+
 static void expression(void) {
 
 }
@@ -85,6 +99,6 @@ bool compile(const char* source, bytecode_chunk* chunk) {
     advance_parser();
     expression();
     consume_if_matches(TOKEN_EOF, "Expected end of expression.");
-
+    end_compiler();
     return !parser.had_error;
 }
