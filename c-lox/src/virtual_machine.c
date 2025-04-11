@@ -28,6 +28,10 @@ static interpret_result virtual_machine_run(void) {
         virtual_machine_stack_push(a op b);     \
     } while (false)
 
+#ifdef DEBUG_TRACE_EXECUTION
+    printf("== vm runtime bytecode ==\n");
+#endif
+
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
         printf("stack:  ");
