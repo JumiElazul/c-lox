@@ -41,7 +41,7 @@ token_parser parser;
 bytecode_chunk* compiling_chunk;
 
 static parse_rule* get_rule(token_type type);
-static void expression(void);
+static void parse_expression(void);
 static void parse_precedence(precedence prec);
 
 static bytecode_chunk* current_chunk(void) {
@@ -158,15 +158,24 @@ static void binary(void) {
 }
 
 static void grouping(void) {
-    expression();
+    parse_expression();
     consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after grouping expression.");
 }
 
 // When we find a number literal, there's nothing else to do but add the constant to the chunk's
 // constant table and write the proper opcode.
 static void number(void) {
-    double value = strtod(parser.previous.start, NULL);
-    emit_constant(value);
+    double val = strtod(parser.previous.start, NULL);
+    emit_constant(NUMBER_VAL(val));
+}
+
+static void literal(void) {
+    switch (parser.previous.type) {
+        case TOKEN_NULL:  emit_byte(OP_NULL);  break;
+        case TOKEN_TRUE:  emit_byte(OP_TRUE);  break;
+        case TOKEN_FALSE: emit_byte(OP_FALSE); break;
+        default: return;
+    }
 }
 
 static void unary(void) {
@@ -181,6 +190,7 @@ static void unary(void) {
     parse_precedence(PREC_UNARY);
 
     switch (operator_type) {
+        case TOKEN_BANG:  emit_byte(OP_NOT);    break;
         case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
         default: return;
     }
@@ -198,7 +208,7 @@ static parse_rule rules[] = {
     [TOKEN_SEMICOLON]     = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_SLASH]         = { NULL,     binary,   PREC_FACTOR },
     [TOKEN_STAR]          = { NULL,     binary,   PREC_FACTOR },
-    [TOKEN_BANG]          = { NULL,     NULL,     PREC_NONE   },
+    [TOKEN_BANG]          = { unary,    NULL,     PREC_NONE   },
     [TOKEN_BANG_EQUAL]    = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_EQUAL]         = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_EQUAL_EQUAL]   = { NULL,     NULL,     PREC_NONE   },
@@ -212,17 +222,17 @@ static parse_rule rules[] = {
     [TOKEN_AND]           = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_CLASS]         = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_ELSE]          = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_FALSE]         = { NULL,     NULL,     PREC_NONE   },
+    [TOKEN_FALSE]         = { literal,  NULL,     PREC_NONE   },
     [TOKEN_FOR]           = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_FUNC]          = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_IF]            = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_NULL]          = { NULL,     NULL,     PREC_NONE   },
+    [TOKEN_NULL]          = { literal,  NULL,     PREC_NONE   },
     [TOKEN_OR]            = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_PRINT]         = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_RETURN]        = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_SUPER]         = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_THIS]          = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_TRUE]          = { NULL,     NULL,     PREC_NONE   },
+    [TOKEN_TRUE]          = { literal,  NULL,     PREC_NONE   },
     [TOKEN_VAR]           = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_WHILE]         = { NULL,     NULL,     PREC_NONE   },
     [TOKEN_ERROR]         = { NULL,     NULL,     PREC_NONE   },
@@ -256,7 +266,7 @@ static parse_rule* get_rule(token_type type) {
 // array of function pointers. The indexes in the array correspond to the
 // TokenType enum values, and the function at each index is the code to compile
 // an expression of that token type.
-static void expression(void) {
+static void parse_expression(void) {
     parse_precedence(PREC_ASSIGNMENT);
 }
 
@@ -268,7 +278,7 @@ bool compile(const char* source, bytecode_chunk* chunk) {
     parser.panic_mode = false;
 
     advance_parser();
-    expression();
+    parse_expression();
     consume_if_matches(TOKEN_EOF, "Expected end of expression.");
     end_compiler();
     return !parser.had_error;
