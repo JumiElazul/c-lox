@@ -1,6 +1,7 @@
 #include "object.h"
 #include "memory.h"
 #include "value.h"
+#include <stdio.h>
 #include <string.h>
 
 #define ALLOCATE_OBJ(type, object_type) \
@@ -28,4 +29,12 @@ obj_string* copy_string(const char* chars, int length) {
     memcpy(buffer, chars, length + 1);
     buffer[length] = '\0';
     return allocate_string(buffer, length);
+}
+
+void print_object(value val) {
+    switch (OBJ_TYPE(val)) {
+        case OBJ_STRING: {
+            printf("%s", AS_CSTRING(val));
+        }
+    }
 }

@@ -1,5 +1,6 @@
 #include "value.h"
 #include "memory.h"
+#include "object.h"
 #include <stdio.h>
 
 void init_value_array(value_array* array) {
@@ -32,6 +33,9 @@ void print_value(value val) {
         } break;
         case VAL_NUMBER: {
             printf("%g", AS_NUMBER(val));
+        } break;
+        case VAL_OBJ: {
+            print_object(val);
         } break;
     }
 }
