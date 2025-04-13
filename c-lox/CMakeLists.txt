@@ -12,6 +12,8 @@ set(SOURCES
     "src/lexer.c"
     "src/memory.h"
     "src/memory.c"
+    "src/object.h"
+    "src/object.c"
     "src/value.h"
     "src/value.c"
     "src/virtual_machine.h"
