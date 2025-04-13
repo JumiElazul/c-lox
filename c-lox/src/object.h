@@ -17,6 +17,8 @@ struct obj_string {
     char* chars;
 };
 
+obj_string* copy_string(const char* chars, int length);
+
 static inline bool is_obj_type(value val, obj_type type) {
     return IS_OBJ(val) && AS_OBJ(val)->type == type;
 }
