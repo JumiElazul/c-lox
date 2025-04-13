@@ -8,6 +8,51 @@
 #include "disassembler.h"
 #endif
 
+// program              -> declaration* EOF ;
+// declaration          -> class_declaration | func_declaration | variable_declaration | statement ;
+// class_declaration    -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;
+// func_declaration     -> "func" function ;
+// function             -> IDENTIFIER "(" parameters? ")" block ;
+// parameters           -> IDENTIFIER ( "," IDENTIFIER)* ;
+// variable_declaration -> "var" IDENTIFIER ( "=" expression )? ";" ;
+// statement            -> print_statement
+//                       | if_statement
+//                       | while_statement
+//                       | for_statement
+//                       | block_statement
+//                       | break_statement
+//                       | continue_statement
+//              		 | return_statement
+//     		             | expression_statement ;
+//
+// print_statement      -> "print" "(" expression ")" ";" ;
+
+// if_statement         -> "if" "(" expression ")" statement ( "else if" statement )? ( "else" statement )? ;
+// while_statement      -> "while" "(" expression ")" statement ;
+// for_statement        -> "for" "(" ( variable_declaration | expression_statement | ";" )
+//    						expression? ";"
+//    						expression? ")" statement ;
+//
+// block_statement      -> "{" declaration* "}" ;
+// break_statement      -> "break" ";" ;
+// continue_statement   -> "continue" ";" ;
+// return_statement     -> "return" expression? ";" ;
+// expression_statement -> expression ";" ;
+
+// expression           -> assignment ;
+// assignment           -> ( call "." )? IDENTIFIER "=" assignment | logic_or ;
+// logic_or             -> logic_and ( "or" logic_and )* ;
+// logic_and            -> equality ( "and" equality )* ;
+// equality             -> comparison ( ( "!=" | "==" ) comparison )* ;
+// comparison           -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+// term                 -> factor ( ( "-" | "+" ) factor )* ;
+// factor               -> unary ( ( "*" | "/" ) unary )* ;
+// unary                -> ( "!" | "-" ) unary | call ;
+// call                 -> primary ( "(" arguments? ") | "." IDENTIFIER )* ;
+// arguments            -> expression ( "," expression )* ;
+
+// primary              -> NUMBER | STRING | "true" | "false" | "null" | "(" expression ")" | IDENTIFIER | "super" "." IDENTIFIER ;
+
 typedef struct token_parser {
     token current;
     token previous;
@@ -197,46 +242,46 @@ static void unary(void) {
 }
 
 static parse_rule rules[] = {
-    [TOKEN_LEFT_PAREN]    = { grouping, NULL,     PREC_NONE   },
-    [TOKEN_RIGHT_PAREN]   = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_LEFT_BRACE]    = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_RIGHT_BRACE]   = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_COMMA]         = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_DOT]           = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_MINUS]         = { unary,    binary,   PREC_TERM   },
-    [TOKEN_PLUS]          = { NULL,     binary,   PREC_TERM   },
-    [TOKEN_SEMICOLON]     = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_SLASH]         = { NULL,     binary,   PREC_FACTOR },
-    [TOKEN_STAR]          = { NULL,     binary,   PREC_FACTOR },
-    [TOKEN_BANG]          = { unary,    NULL,     PREC_NONE   },
-    [TOKEN_BANG_EQUAL]    = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_EQUAL]         = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_EQUAL_EQUAL]   = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_GREATER]       = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_GREATER_EQUAL] = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_LESS]          = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_LESS_EQUAL]    = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_IDENTIFIER]    = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_STRING]        = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_NUMBER]        = { number,   NULL,     PREC_NONE   },
-    [TOKEN_AND]           = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_CLASS]         = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_ELSE]          = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_FALSE]         = { literal,  NULL,     PREC_NONE   },
-    [TOKEN_FOR]           = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_FUNC]          = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_IF]            = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_NULL]          = { literal,  NULL,     PREC_NONE   },
-    [TOKEN_OR]            = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_PRINT]         = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_RETURN]        = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_SUPER]         = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_THIS]          = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_TRUE]          = { literal,  NULL,     PREC_NONE   },
-    [TOKEN_VAR]           = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_WHILE]         = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_ERROR]         = { NULL,     NULL,     PREC_NONE   },
-    [TOKEN_EOF]           = { NULL,     NULL,     PREC_NONE   },
+    [TOKEN_LEFT_PAREN]    = { grouping, NULL,     PREC_NONE       },
+    [TOKEN_RIGHT_PAREN]   = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_LEFT_BRACE]    = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_RIGHT_BRACE]   = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_COMMA]         = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_DOT]           = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_MINUS]         = { unary,    binary,   PREC_TERM       },
+    [TOKEN_PLUS]          = { NULL,     binary,   PREC_TERM       },
+    [TOKEN_SEMICOLON]     = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_SLASH]         = { NULL,     binary,   PREC_FACTOR     },
+    [TOKEN_STAR]          = { NULL,     binary,   PREC_FACTOR     },
+    [TOKEN_BANG]          = { unary,    NULL,     PREC_NONE       },
+    [TOKEN_BANG_EQUAL]    = { NULL,     binary,   PREC_EQUALITY   },
+    [TOKEN_EQUAL]         = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_EQUAL_EQUAL]   = { NULL,     binary,   PREC_EQUALITY   },
+    [TOKEN_GREATER]       = { NULL,     binary,   PREC_COMPARISON },
+    [TOKEN_GREATER_EQUAL] = { NULL,     binary,   PREC_COMPARISON },
+    [TOKEN_LESS]          = { NULL,     binary,   PREC_COMPARISON },
+    [TOKEN_LESS_EQUAL]    = { NULL,     binary,   PREC_COMPARISON },
+    [TOKEN_IDENTIFIER]    = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_STRING]        = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_NUMBER]        = { number,   NULL,     PREC_NONE       },
+    [TOKEN_AND]           = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_CLASS]         = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_ELSE]          = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_FALSE]         = { literal,  NULL,     PREC_NONE       },
+    [TOKEN_FOR]           = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_FUNC]          = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_IF]            = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_NULL]          = { literal,  NULL,     PREC_NONE       },
+    [TOKEN_OR]            = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_PRINT]         = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_RETURN]        = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_SUPER]         = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_THIS]          = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_TRUE]          = { literal,  NULL,     PREC_NONE       },
+    [TOKEN_VAR]           = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_WHILE]         = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_ERROR]         = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_EOF]           = { NULL,     NULL,     PREC_NONE       },
 };
 
 static void parse_precedence(precedence prec) {
