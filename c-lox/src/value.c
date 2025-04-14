@@ -2,6 +2,7 @@
 #include "memory.h"
 #include "object.h"
 #include <stdio.h>
+#include <string.h>
 
 void init_value_array(value_array* array) {
     array->capacity = 0;
@@ -49,6 +50,16 @@ bool values_equal(value a, value b) {
         case VAL_BOOL:   return AS_BOOL(a) == AS_BOOL(b);
         case VAL_NULL:   return true;
         case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
+        case VAL_OBJ: {
+            obj_string* a_string = AS_STRING(a);
+            obj_string* b_string = AS_STRING(b);
+            // The strings are the same if their length is the same, and the memory
+            // for the next a_string->length bytes is the same.
+            return a_string->length == b_string->length &&
+                memcmp(a_string->chars, 
+                       b_string->chars,
+                       a_string->length) == 0;
+        }
         default: return false;
     }
 }
