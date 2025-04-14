@@ -16,6 +16,7 @@ struct obj_string {
     obj obj;
     int length;
     char* chars;
+    uint32_t hash;
 };
 
 obj_string* take_string(char* chars, int length);
