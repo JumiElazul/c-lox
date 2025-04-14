@@ -1,6 +1,7 @@
 #include "object.h"
 #include "memory.h"
 #include "value.h"
+#include "virtual_machine.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -11,6 +12,10 @@ static obj* allocate_object(size_t size, obj_type type) {
     // Allocate enough memory for the size of the struct being passed in, and then set the field.
     obj* object = (obj*)reallocate(NULL, 0, size);
     object->type = type;
+
+    object->next = vm.objects;
+    vm.objects = object;
+
     return object;
 }
 
@@ -23,8 +28,14 @@ static obj_string* allocate_string(char* chars, int length) {
     return string;
 }
 
+// In this function we have already allocated the memory from the virtual machine for the string 
+// concatenation, and we just need to produce an obj_string* object from it.
+obj_string* take_string(char* chars, int length) {
+    return allocate_string(chars, length);
+}
+
+// In this function we need to actually allocate new memory for the obj_string->chars portion of the string.
 obj_string* copy_string(const char* chars, int length) {
-    // Allocate enough for just the characters that will be stored in obj_string->chars.
     char* buffer = ALLOCATE(char, length + 1);
     memcpy(buffer, chars, length + 1);
     buffer[length] = '\0';
