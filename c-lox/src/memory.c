@@ -1,4 +1,6 @@
 #include "memory.h"
+#include "object.h"
+#include "virtual_machine.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -22,3 +24,25 @@ void* reallocate(void* pointer, size_t old_size, size_t new_size) {
 
     return result;
 }
+
+static void free_object(obj* object) {
+    switch (object->type) {
+        case OBJ_STRING: {
+            obj_string* string = (obj_string*)object;
+            FREE_ARRAY(char, string->chars, string->length + 1);
+            FREE(obj_string, object);
+        } break;
+        default:
+            return;
+    }
+}
+
+void free_objects(void) {
+    obj* object = vm.objects;
+    while (object != NULL) {
+        obj* next = object->next;
+        free_object(object);
+        object = next;
+    }
+}
+

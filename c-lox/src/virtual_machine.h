@@ -11,6 +11,7 @@ typedef struct virtual_machine {
     uint8_t* ip;
     value stack[STACK_MAX];
     value* stack_top;
+    obj* objects;
 } virtual_machine;
 
 typedef enum interpret_result {
@@ -18,6 +19,8 @@ typedef enum interpret_result {
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,
 } interpret_result;
+
+extern virtual_machine vm;
 
 void init_virtual_machine(void);
 void free_virtual_machine(void);

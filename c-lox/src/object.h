@@ -9,6 +9,7 @@ typedef enum {
 
 struct obj {
     obj_type type;
+    struct obj* next;
 };
 
 struct obj_string {
@@ -17,6 +18,7 @@ struct obj_string {
     char* chars;
 };
 
+obj_string* take_string(char* chars, int length);
 obj_string* copy_string(const char* chars, int length);
 void print_object(value val);
 
