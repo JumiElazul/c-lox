@@ -13,8 +13,11 @@ typedef struct {
     table_entry* entries;
 } hash_table;
 
-void init_hash_table(hash_table* table);
-void free_hash_table(hash_table* table);
-bool set_hash_table(hash_table* table, obj_string* key, value val);
+void hash_table_init(hash_table* table);
+void hash_table_free(hash_table* table);
+float hash_table_load_factor(hash_table* table);
+bool hash_table_get(hash_table* table, obj_string* key, value* val);
+bool hash_table_set(hash_table* table, obj_string* key, value val);
+void hash_table_add_all(hash_table* from, hash_table* to);
 
 #endif
