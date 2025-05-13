@@ -2,6 +2,7 @@
 #define JUMI_CLOX_VIRTUAL_MACHINE_H
 #include "bytecode_chunk.h"
 #include "common.h"
+#include "hash_table.h"
 #include "value.h"
 
 #define STACK_MAX 256
@@ -11,6 +12,7 @@ typedef struct virtual_machine {
     uint8_t* ip;
     value stack[STACK_MAX];
     value* stack_top;
+    hash_table interned_strings;
     obj* objects;
 } virtual_machine;
 

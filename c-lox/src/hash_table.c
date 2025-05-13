@@ -19,24 +19,31 @@ void hash_table_free(hash_table* table) {
 }
 
 float hash_table_load_factor(hash_table* table) {
+    if (table->capacity == 0) {
+        return 1.0;
+    }
+
     return (float)table->count / (float)table->capacity;
 }
 
 static table_entry* find_entry(table_entry* entries, int capacity, obj_string* key) {
     uint32_t index = key->hash % capacity;
-    // If the key at the index is NULL, the bucket is empty.  If we are using find_entry to look up
-    // something in the hash table, this means it isn't there.  If we're using it to insert, it means
-    // we've found the place to add the new entry.
-
-    // If the key in the bucket is equal to the key we're looking for, then that key is already present
-    // in the table.  If we're doing a lookup, we've found the key we seek.  If we're doing an insert,
-    // we will replace the value for that key instead of adding a new entry.
-
-    // Otherwise, the bucket has an entry with it, but with a different key (collision).  We start our linear
-    // probing to find the next avaiable spot for the key.
     for (;;) {
         table_entry* entry = &entries[index];
-        if (entry->key == key || entry->key == NULL) {
+        table_entry* tombstone = NULL;
+
+        if (entry->key == NULL) {
+            if (IS_NULL(entry->val)) {
+                // Empty entry, if tombstone was passed to get here return that spot instead
+                return tombstone != NULL ? tombstone : entry;
+            } else {
+                // Found tombstone, set it and continue
+                if (tombstone == NULL) {
+                    tombstone = entry;
+                }
+            }
+        } else if (entry->key == key) {
+            // Found the key
             return entry;
         }
 
@@ -56,6 +63,8 @@ static void adjust_capacity(hash_table* table, int capacity) {
 
     // Loop over the old table, rehashing in find_entry and inserting into its new
     // proper place.
+    table->count = 0;
+
     for (int i = 0; i < table->capacity; ++i) {
         table_entry* entry = &table->entries[i];
         if (entry->key == NULL) {
@@ -65,6 +74,7 @@ static void adjust_capacity(hash_table* table, int capacity) {
         table_entry* destination = find_entry(entries, capacity, entry->key);
         destination->key = entry->key;
         destination->val = entry->val;
+        ++table->count;
     }
 
     FREE_ARRAY(table_entry, table->entries, table->capacity);
@@ -94,7 +104,7 @@ bool hash_table_set(hash_table* table, obj_string* key, value val) {
 
     table_entry* entry = find_entry(table->entries, table->capacity, key);
     bool is_new_key = entry->key == NULL;
-    if (is_new_key) {
+    if (is_new_key && IS_NULL(entry->val)) {
         ++table->count;
     }
 
@@ -104,11 +114,48 @@ bool hash_table_set(hash_table* table, obj_string* key, value val) {
     return is_new_key;
 }
 
+bool hash_table_delete(hash_table* table, obj_string* key) {
+    if (table->count == 0) {
+        return false;
+    }
+
+    table_entry* entry = find_entry(table->entries, table->capacity, key);
+    if (entry->key == NULL) {
+        return false;
+    }
+
+    entry->key = NULL;
+    entry->val = BOOL_VAL(true);
+    return true;
+}
+
 void hash_table_add_all(hash_table* from, hash_table* to) {
     for (int i = 0; i < from->capacity; ++i) {
         table_entry* entry = &from->entries[i];
         if (entry->key != NULL) {
             hash_table_set(to, entry->key, entry->val);
         }
+    }
+}
+
+obj_string* hash_table_find_string(hash_table* table, const char* chars, int length, uint32_t hash) {
+    if (table->count == 0) return NULL;
+
+    uint32_t index = hash % table->capacity;
+
+    for (;;) {
+        table_entry* entry = &table->entries[index];
+        if (entry->key == NULL) {
+            // Stop if we find an empty non-tombstone entry.
+            if (IS_NULL(entry->val)) {
+                return NULL;
+            }
+        } else if (entry->key->length == length &&
+                   entry->key->hash == hash &&
+                   memcmp(entry->key->chars, chars, length) == 0) {
+            // We found it.
+            return entry->key;
+        }
+        index = (index + 1) % table->capacity;
     }
 }
