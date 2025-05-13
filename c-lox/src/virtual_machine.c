@@ -2,6 +2,7 @@
 #include "bytecode_chunk.h"
 #include "compiler.h"
 #include "disassembler.h"
+#include "hash_table.h"
 #include "object.h"
 #include "value.h"
 #include <stdarg.h>
@@ -30,9 +31,11 @@ static void runtime_error(const char* format, ...) {
 void init_virtual_machine(void) {
     reset_stack();
     vm.objects = NULL;
+    hash_table_init(&vm.interned_strings);
 }
 
 void free_virtual_machine(void) {
+    hash_table_free(&vm.interned_strings);
     free_objects();
 }
 

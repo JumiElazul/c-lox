@@ -1,4 +1,5 @@
 #include "object.h"
+#include "hash_table.h"
 #include "memory.h"
 #include "value.h"
 #include "virtual_machine.h"
@@ -26,6 +27,7 @@ static obj_string* allocate_string(char* chars, int length, uint32_t hash) {
     string->length = length;
     string->chars = chars;
     string->hash = hash;
+    hash_table_set(&vm.interned_strings, string, NULL_VAL);
     return string;
 }
 
@@ -42,12 +44,25 @@ static uint32_t hash_string(const char* key, int length) {
 // concatenation, and we just need to produce an obj_string* object from it.
 obj_string* take_string(char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
+
+    obj_string* interned_string = hash_table_find_string(&vm.interned_strings, chars, length, hash);
+    if (interned_string != NULL) {
+        FREE_ARRAY(char, chars, length + 1);
+        return interned_string;
+    }
+
     return allocate_string(chars, length, hash);
 }
 
 // In this function we need to actually allocate new memory for the obj_string->chars portion of the string.
 obj_string* copy_string(const char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
+
+    obj_string* interned_string = hash_table_find_string(&vm.interned_strings, chars, length, hash);
+    if (interned_string != NULL) {
+        return interned_string;
+    }
+
     char* buffer = ALLOCATE(char, length + 1);
     memcpy(buffer, chars, length + 1);
     buffer[length] = '\0';
