@@ -165,6 +165,7 @@ static interpret_result virtual_machine_run(void) {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef BINARY_OP
 }
 
 interpret_result virtual_machine_interpret(const char* source) {
