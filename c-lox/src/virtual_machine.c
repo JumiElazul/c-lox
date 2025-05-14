@@ -31,10 +31,12 @@ static void runtime_error(const char* format, ...) {
 void init_virtual_machine(void) {
     reset_stack();
     vm.objects = NULL;
+    hash_table_init(&vm.global_variables);
     hash_table_init(&vm.interned_strings);
 }
 
 void free_virtual_machine(void) {
+    hash_table_free(&vm.global_variables);
     hash_table_free(&vm.interned_strings);
     free_objects();
 }
@@ -75,6 +77,7 @@ static void concatenate(void) {
 static interpret_result virtual_machine_run(void) {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.current_chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type, op)                          \
     do {                                                   \
         if (!IS_NUMBER(virtual_machine_stack_peek(0)) ||   \
@@ -118,6 +121,33 @@ static interpret_result virtual_machine_run(void) {
             case OP_FALSE: {
                 virtual_machine_stack_push(BOOL_VAL(false));
             } break;
+            case OP_POP: {
+                virtual_machine_stack_pop();
+            } break;
+            case OP_GET_GLOBAL: {
+                obj_string* name = READ_STRING();
+                value val;
+                if (!hash_table_get(&vm.global_variables, name, &val)) {
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                virtual_machine_stack_push(val);
+            } break;
+            case OP_DEFINE_GLOBAL: {
+                obj_string* name = READ_STRING();
+                hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
+                virtual_machine_stack_pop();
+            } break;
+            case OP_SET_GLOBAL: {
+                obj_string* name = READ_STRING();
+
+                if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
+                    hash_table_delete(&vm.global_variables, name);
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+            } break;
             case OP_EQUAL: {
                 value b = virtual_machine_stack_pop();
                 value a = virtual_machine_stack_pop();
@@ -158,9 +188,11 @@ static interpret_result virtual_machine_run(void) {
                 }
                 virtual_machine_stack_push(NUMBER_VAL(-AS_NUMBER(virtual_machine_stack_pop())));
             } break;
-            case OP_RETURN: {
+            case OP_PRINT: {
                 print_value(virtual_machine_stack_pop());
                 printf("\n");
+            } break;
+            case OP_RETURN: {
                 return INTERPRET_OK;
             } break;
         }
@@ -168,6 +200,7 @@ static interpret_result virtual_machine_run(void) {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRING
 #undef BINARY_OP
 }
 

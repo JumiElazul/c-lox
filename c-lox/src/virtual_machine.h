@@ -12,6 +12,7 @@ typedef struct virtual_machine {
     uint8_t* ip;
     value stack[STACK_MAX];
     value* stack_top;
+    hash_table global_variables;
     hash_table interned_strings;
     obj* objects;
 } virtual_machine;
