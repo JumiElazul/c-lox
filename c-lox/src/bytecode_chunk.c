@@ -11,7 +11,7 @@ void init_bytecode_chunk(bytecode_chunk* chunk) {
     init_value_array(&chunk->constants);
 }
 
-// Free the
+// Free the chunk
 void free_bytecode_chunk(bytecode_chunk* chunk) {
     FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
     FREE_ARRAY(int, chunk->lines, chunk->capacity);
