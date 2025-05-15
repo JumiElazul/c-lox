@@ -1,4 +1,5 @@
 #include "compiler.h"
+#include "common.h"
 #include "bytecode_chunk.h"
 #include "lexer.h"
 #include "object.h"
@@ -83,7 +84,20 @@ typedef struct parse_rule {
     precedence prec;
 } parse_rule;
 
+typedef struct {
+    token name;
+    int depth;
+} local_variable;
+
+typedef struct {
+    local_variable locals[UINT8_COUNT];
+    int local_count;
+    int local_depth;
+    int scope_depth;
+} compiler;
+
 token_parser parser;
+compiler* current_compiler = NULL;
 bytecode_chunk* compiling_chunk;
 
 static parse_rule* get_rule(token_type type);
@@ -192,6 +206,12 @@ static void emit_constant(value val) {
     emit_bytes2(OP_CONSTANT, make_constant(val));
 }
 
+static void init_compiler(compiler* comp) {
+    comp->local_count = 0;
+    comp->scope_depth = 0;
+    current_compiler = comp;
+}
+
 static void end_compiler(void) {
     emit_return();
 
@@ -200,6 +220,14 @@ static void end_compiler(void) {
         disassemble_bytecode_chunk(current_chunk(), "code");
     }
 #endif
+}
+
+static void begin_scope(void) {
+    ++current_compiler->scope_depth;
+}
+
+static void end_scope(void) {
+    --current_compiler->scope_depth;
 }
 
 static void binary(bool can_assign) {
@@ -431,6 +459,14 @@ static void expression_statement(void) {
     emit_byte(OP_POP);
 }
 
+static void block_statement(void) {
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        declaration();
+    }
+
+    consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' after block.");
+}
+
 static void declaration(void) {
     if (matches_token(TOKEN_VAR)) {
         variable_declaration();
@@ -446,6 +482,10 @@ static void declaration(void) {
 static void statement(void) {
     if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_LEFT_BRACE)) {
+        begin_scope();
+        block_statement();
+        end_scope();
     } else {
         expression_statement();
     }
@@ -453,6 +493,8 @@ static void statement(void) {
 
 bool compile(const char* source, bytecode_chunk* chunk) {
     init_lexer(source);
+    compiler compiler;
+    init_compiler(&compiler);
     compiling_chunk = chunk;
 
     parser.had_error = false;
