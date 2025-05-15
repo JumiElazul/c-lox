@@ -5,6 +5,7 @@
 #include "object.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef DEBUG_PRINT_CODE
 #include "disassembler.h"
@@ -106,6 +107,7 @@ static void statement(void);
 static void declaration(void);
 static void parse_precedence(precedence prec);
 static uint8_t identifier_constant(token* name);
+static int resolve_local(compiler* comp, token* name);
 
 static bytecode_chunk* current_chunk(void) {
     return compiling_chunk;
@@ -228,6 +230,13 @@ static void begin_scope(void) {
 
 static void end_scope(void) {
     --current_compiler->scope_depth;
+
+    while (current_compiler->local_count > 0 &&
+           current_compiler->locals[current_compiler->local_count - 1].depth >
+           current_compiler->scope_depth) {
+        emit_byte(OP_POP);
+        --current_compiler->local_count;
+    }
 }
 
 static void binary(bool can_assign) {
@@ -274,13 +283,23 @@ static void string(bool can_assign) {
 }
 
 static void named_variable(token name, bool can_assign) {
-    uint8_t arg = identifier_constant(&name);
+    uint8_t get_op, set_op;
+
+    int arg = resolve_local(current_compiler, &name);
+    if (arg != -1) {
+        get_op = OP_GET_LOCAL;
+        set_op = OP_SET_LOCAL;
+    } else {
+        arg = identifier_constant(&name);
+        get_op = OP_GET_GLOBAL;
+        set_op = OP_SET_GLOBAL;
+    }
     
     if (can_assign && matches_token(TOKEN_EQUAL)) {
         parse_expression();
-        emit_bytes2(OP_SET_GLOBAL, arg);
+        emit_bytes2(set_op, (uint8_t)arg);
     } else {
-        emit_bytes2(OP_GET_GLOBAL, arg);
+        emit_bytes2(get_op, (uint8_t)arg);
     }
 }
 
@@ -385,12 +404,84 @@ static uint8_t identifier_constant(token* name) {
     return make_constant(OBJ_VAL(copy_string(name->start, name->length)));
 }
 
+static bool identifiers_equal(token* a, token* b) {
+    if (a->length != b->length) {
+        return false;
+    }
+    return memcmp(a->start, b->start, a->length) == 0;
+}
+
+static int resolve_local(compiler* comp, token* name) {
+    for (int i = comp->local_count - 1; i >= 0; --i) {
+        local_variable* local = &comp->locals[i];
+        if (identifiers_equal(name, &local->name)) {
+            if (local->depth == -1) {
+                error("Can't read local variable in its own initializer.");
+            }
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static void add_local_variable(token name) {
+    if (current_compiler->local_count == UINT8_COUNT) {
+        error("Too many local variables in function.");
+        return;
+    }
+
+    local_variable* local = &current_compiler->locals[current_compiler->local_count++];
+    local->name = name;
+    local->depth = -1;
+}
+
+static void declare_variable(void) {
+    if (current_compiler->scope_depth == 0) {
+        return;
+    }
+
+    token* name = &parser.previous;
+
+    for (int i = current_compiler->local_count - 1; i >= 0; --i) {
+        local_variable* local = &current_compiler->locals[i];
+
+        if (local->depth != -1 && local->depth < current_compiler->scope_depth) {
+            break;
+        }
+
+        if (identifiers_equal(name, &local->name)) {
+            error("Already a variable with this name in this scope.");
+        }
+    }
+
+    add_local_variable(*name);
+}
+
 static uint8_t parse_variable(const char* err_msg) {
     consume_if_matches(TOKEN_IDENTIFIER, err_msg);
+
+    declare_variable();
+
+    // If it's a local, we don't need to do anything else here.
+    if (current_compiler->scope_depth > 0) {
+        return 0;
+    }
+
     return identifier_constant(&parser.previous);
 }
 
+static void mark_initialized(void) {
+    compiler* c = current_compiler;
+    c->locals[c->local_count - 1].depth = c->scope_depth;
+}
+
 static void define_variable(uint8_t global_index) {
+    if (current_compiler->scope_depth > 0) {
+        mark_initialized();
+        return;
+    }
+
     emit_bytes2(OP_DEFINE_GLOBAL, global_index);
 }
 
@@ -455,7 +546,7 @@ static void synchronize(void) {
 
 static void expression_statement(void) {
     parse_expression();
-    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after expresssion.");
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after expression.");
     emit_byte(OP_POP);
 }
 
