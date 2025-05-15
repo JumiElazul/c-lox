@@ -17,6 +17,12 @@ static int simple_instruction(const char* name, int offset) {
     return offset + 1;
 }
 
+static int byte_instruction(const char* name, bytecode_chunk* chunk, int offset) {
+    uint8_t slot = chunk->code[offset + 1];
+    printf("%-24s %6d\n", name, slot);
+    return offset + 2;
+}
+
 // Get the next byte from the chunk, which holds the index of where to find the
 // value in the constants table.
 static int constant_instruction(const char* name, bytecode_chunk* chunk, int offset) {
@@ -52,6 +58,12 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
         }
         case OP_POP: {
             return simple_instruction("OP_POP", offset);
+        }
+        case OP_GET_LOCAL: {
+            return byte_instruction("OP_GET_LOCAL", chunk, offset);
+        }
+        case OP_SET_LOCAL: {
+            return byte_instruction("OP_SET_LOCAL", chunk, offset);
         }
         case OP_GET_GLOBAL: {
             return constant_instruction("OP_GET_GLOBAL", chunk, offset);

@@ -124,6 +124,14 @@ static interpret_result virtual_machine_run(void) {
             case OP_POP: {
                 virtual_machine_stack_pop();
             } break;
+            case OP_GET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                virtual_machine_stack_push(vm.stack[slot]);
+            } break;
+            case OP_SET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                vm.stack[slot] = virtual_machine_stack_peek(0);
+            } break;
             case OP_GET_GLOBAL: {
                 obj_string* name = READ_STRING();
                 value val;
@@ -141,7 +149,6 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_SET_GLOBAL: {
                 obj_string* name = READ_STRING();
-
                 if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);
