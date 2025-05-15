@@ -425,6 +425,10 @@ static int resolve_local(compiler* comp, token* name) {
     return -1;
 }
 
+static bool is_local_variable(void) {
+    return current_compiler->scope_depth > 0;
+}
+
 static void add_local_variable(token name) {
     if (current_compiler->local_count == UINT8_COUNT) {
         error("Too many local variables in function.");
@@ -437,10 +441,6 @@ static void add_local_variable(token name) {
 }
 
 static void declare_variable(void) {
-    if (current_compiler->scope_depth == 0) {
-        return;
-    }
-
     token* name = &parser.previous;
 
     for (int i = current_compiler->local_count - 1; i >= 0; --i) {
@@ -461,10 +461,8 @@ static void declare_variable(void) {
 static uint8_t parse_variable(const char* err_msg) {
     consume_if_matches(TOKEN_IDENTIFIER, err_msg);
 
-    declare_variable();
-
-    // If it's a local, we don't need to do anything else here.
-    if (current_compiler->scope_depth > 0) {
+    if (is_local_variable()) {
+        declare_variable();
         return 0;
     }
 
@@ -476,13 +474,13 @@ static void mark_initialized(void) {
     c->locals[c->local_count - 1].depth = c->scope_depth;
 }
 
-static void define_variable(uint8_t global_index) {
-    if (current_compiler->scope_depth > 0) {
+static void define_variable(uint8_t index) {
+    if (is_local_variable()) {
         mark_initialized();
         return;
     }
 
-    emit_bytes2(OP_DEFINE_GLOBAL, global_index);
+    emit_bytes2(OP_DEFINE_GLOBAL, index);
 }
 
 static parse_rule* get_rule(token_type type) {
@@ -499,7 +497,7 @@ static void parse_expression(void) {
 }
 
 static void variable_declaration(void) {
-    uint8_t global_index = parse_variable("Expected variable name.");
+    uint8_t index = parse_variable("Expected variable name.");
 
     if (matches_token(TOKEN_EQUAL)) {
         parse_expression();
@@ -508,7 +506,7 @@ static void variable_declaration(void) {
     }
 
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-    define_variable(global_index);
+    define_variable(index);
 }
 
 static void print_statement(void) {
