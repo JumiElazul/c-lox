@@ -1,15 +1,13 @@
 #include "compiler.h"
 #include "common.h"
 #include "bytecode_chunk.h"
+#include "disassembler.h"
 #include "lexer.h"
 #include "object.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef DEBUG_PRINT_CODE
-#include "disassembler.h"
-#endif
 
 // program              -> declaration* EOF ;
 // declaration          -> class_declaration | func_declaration | variable_declaration | statement ;
@@ -108,6 +106,8 @@ static void declaration(void);
 static void parse_precedence(precedence prec);
 static uint8_t identifier_constant(token* name);
 static int resolve_local(compiler* comp, token* name);
+static void and_(bool can_assign);
+static void or_(bool can_assign);
 
 static bytecode_chunk* current_chunk(void) {
     return compiling_chunk;
@@ -185,6 +185,18 @@ static void emit_bytes2(uint8_t byte1, uint8_t byte2) {
     emit_byte(byte2);
 }
 
+static void emit_loop(int loop_start) {
+    emit_byte(OP_LOOP);
+
+    int offset = current_chunk()->count - loop_start + 2;
+    if (offset > UINT16_MAX) {
+        error("Loop body too large.");
+    }
+
+    emit_byte((offset) >> 8 & 0xFF);
+    emit_byte(offset & 0xFF);
+}
+
 static int emit_jump(uint8_t instruction) {
     emit_byte(instruction);
     emit_byte(0xFF);
@@ -235,11 +247,11 @@ static void init_compiler(compiler* comp) {
 static void end_compiler(void) {
     emit_return();
 
-#ifdef DEBUG_PRINT_CODE
-    if (!parser.had_error) {
-        disassemble_bytecode_chunk(current_chunk(), "code");
+    if (debug_print_code) {
+        if (!parser.had_error) {
+            disassemble_bytecode_chunk(current_chunk(), "code");
+        }
     }
-#endif
 }
 
 static void begin_scope(void) {
@@ -375,7 +387,7 @@ static parse_rule rules[] = {
     [TOKEN_IDENTIFIER]    = { variable, NULL,     PREC_NONE       },
     [TOKEN_STRING]        = { string,   NULL,     PREC_NONE       },
     [TOKEN_NUMBER]        = { number,   NULL,     PREC_NONE       },
-    [TOKEN_AND]           = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_AND]           = { NULL,     and_,     PREC_AND        },
     [TOKEN_CLASS]         = { NULL,     NULL,     PREC_NONE       },
     [TOKEN_ELSE]          = { NULL,     NULL,     PREC_NONE       },
     [TOKEN_FALSE]         = { literal,  NULL,     PREC_NONE       },
@@ -383,7 +395,7 @@ static parse_rule rules[] = {
     [TOKEN_FUNC]          = { NULL,     NULL,     PREC_NONE       },
     [TOKEN_IF]            = { NULL,     NULL,     PREC_NONE       },
     [TOKEN_NULL]          = { literal,  NULL,     PREC_NONE       },
-    [TOKEN_OR]            = { NULL,     NULL,     PREC_NONE       },
+    [TOKEN_OR]            = { NULL,     or_,      PREC_OR         },
     [TOKEN_PRINT]         = { NULL,     NULL,     PREC_NONE       },
     [TOKEN_RETURN]        = { NULL,     NULL,     PREC_NONE       },
     [TOKEN_SUPER]         = { NULL,     NULL,     PREC_NONE       },
@@ -501,6 +513,24 @@ static void define_variable(uint8_t index) {
     emit_bytes2(OP_DEFINE_GLOBAL, index);
 }
 
+static void and_(bool can_assign) {
+    int end_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+    parse_precedence(PREC_AND);
+    patch_jump(end_jump);
+}
+
+static void or_(bool can_assign) {
+    int else_jump = emit_jump(OP_JUMP_IF_FALSE);
+    int end_jump = emit_jump(OP_JUMP);
+
+    patch_jump(else_jump);
+    emit_byte(OP_POP);
+
+    parse_precedence(PREC_OR);
+    patch_jump(end_jump);
+}
+
 static parse_rule* get_rule(token_type type) {
     return &rules[type];
 }
@@ -531,6 +561,24 @@ static void print_statement(void) {
     parse_expression();
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
     emit_byte(OP_PRINT);
+}
+
+static void while_statement(void) {
+    int loop_start = current_chunk()->count;
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after while.");
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected '(' after while.");
+
+    int exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+    // Loop body, ensure to pop the stack expression.  Compile the user's statements
+    // then loop back to the beginning to retest the expression.
+    emit_byte(OP_POP);
+    statement();
+    emit_loop(loop_start);
+
+    // Loop exit after body, patch the exit jump and pop the stack expression.
+    patch_jump(exit_jump);
+    emit_byte(OP_POP);
 }
 
 static void synchronize(void) {
@@ -566,6 +614,58 @@ static void expression_statement(void) {
     emit_byte(OP_POP);
 }
 
+static void for_statement(void) {
+    begin_scope();
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after 'for'.");
+
+    // Initializer expression
+    if (matches_token(TOKEN_SEMICOLON)) {
+        // No initializer
+    } else if (matches_token(TOKEN_VAR)) {
+        variable_declaration();
+    } else {
+        expression_statement();
+    }
+
+    // Conditional expression
+    int loop_start = current_chunk()->count;
+    int exit_jump = -1;
+    if (!matches_token(TOKEN_SEMICOLON)) {
+        parse_expression();
+        consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after loop condition.");
+
+        // Jump out of the loop if the condition is false.
+        exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+        emit_byte(OP_POP);
+    }
+
+    // Increment expression
+    if (!matches_token(TOKEN_RIGHT_PAREN)) {
+        // Skip over the increment expression.  Textually this appears before the loop body,
+        // but in bytecode it executes AFTER the body.
+        int body_jump = emit_jump(OP_JUMP);
+        int increment_start = current_chunk()->count;
+        parse_expression();
+        emit_byte(OP_POP);
+        consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after 'for' clauses.");
+
+        emit_loop(loop_start);
+        loop_start = increment_start;
+        patch_jump(body_jump);
+    }
+
+    // Loop body
+    statement();
+    emit_loop(loop_start);
+
+    if (exit_jump != -1) {
+        patch_jump(exit_jump);
+        emit_byte(OP_POP);
+    }
+
+    end_scope();
+}
+
 static void block_statement(void) {
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
         declaration();
@@ -587,6 +687,8 @@ static void if_statement(void) {
     int then_jump = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
     statement();
+
+    // To prevent fallthrough from when the if statement is true, we need to skip the else block.
     int else_jump = emit_jump(OP_JUMP);
 
     patch_jump(then_jump);
@@ -614,8 +716,12 @@ static void declaration(void) {
 static void statement(void) {
     if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_FOR)) {
+        for_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();
+    } else if (matches_token(TOKEN_WHILE)) {
+        while_statement();
     } else if (matches_token(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block_statement();

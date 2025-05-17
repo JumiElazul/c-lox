@@ -1,5 +1,6 @@
 #include "virtual_machine.h"
 #include "bytecode_chunk.h"
+#include "common.h"
 #include "compiler.h"
 #include "disassembler.h"
 #include "hash_table.h"
@@ -93,21 +94,21 @@ static interpret_result virtual_machine_run(void) {
         virtual_machine_stack_push(value_type(a op b));    \
     } while (false)
 
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("== vm runtime bytecode ==\n");
-#endif
+    if (debug_trace_execution) {
+        printf("== vm runtime bytecode ==\n");
+    }
 
     for (;;) {
-#ifdef DEBUG_TRACE_EXECUTION
-        printf("stack:  ");
-        for (value* slot = vm.stack; slot < vm.stack_top; ++slot) {
-            printf("[");
-            print_value(*slot);
-            printf("]");
+        if (debug_trace_execution) {
+            printf("stack:  ");
+            for (value* slot = vm.stack; slot < vm.stack_top; ++slot) {
+                printf("[");
+                print_value(*slot);
+                printf("]");
+            }
+            printf("\n");
+            disassemble_instruction(vm.current_chunk, (int)(vm.ip - vm.current_chunk->code));
         }
-        printf("\n");
-        disassemble_instruction(vm.current_chunk, (int)(vm.ip - vm.current_chunk->code));
-#endif
 
         uint8_t instruction;
         switch (instruction = READ_BYTE()) {
@@ -211,6 +212,10 @@ static interpret_result virtual_machine_run(void) {
                 if (is_falsey(virtual_machine_stack_peek(0))) {
                     vm.ip += offset;
                 }
+            } break;
+            case OP_LOOP: {
+                uint16_t offset = READ_SHORT();
+                vm.ip -= offset;
             } break;
             case OP_RETURN: {
                 return INTERPRET_OK;

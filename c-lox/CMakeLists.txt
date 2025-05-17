@@ -1,9 +1,10 @@
 set(SOURCES
     "src/main.c"
-    "src/common.h"
 
     "src/bytecode_chunk.h"
     "src/bytecode_chunk.c"
+    "src/common.h"
+    "src/common.c"
     "src/compiler.h"
     "src/compiler.c"
     "src/disassembler.h"
