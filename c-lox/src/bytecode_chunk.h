@@ -1,7 +1,5 @@
 #ifndef JUMI_CLOX_BYTECODE_CHUNK_H
 #define JUMI_CLOX_BYTECODE_CHUNK_H
-#include "common.h"
-#include "memory.h"
 #include "value.h"
 
 typedef enum {
@@ -25,6 +23,8 @@ typedef enum {
     OP_NOT,
     OP_NEGATE,
     OP_PRINT,
+    OP_JUMP,
+    OP_JUMP_IF_FALSE,
     OP_RETURN,
 } opcode;
 

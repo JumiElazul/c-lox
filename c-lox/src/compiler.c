@@ -185,6 +185,13 @@ static void emit_bytes2(uint8_t byte1, uint8_t byte2) {
     emit_byte(byte2);
 }
 
+static int emit_jump(uint8_t instruction) {
+    emit_byte(instruction);
+    emit_byte(0xFF);
+    emit_byte(0xFF);
+    return current_chunk()->count - 2;
+} 
+
 static void emit_return(void) {
     emit_byte(OP_RETURN);
 }
@@ -206,6 +213,17 @@ static uint8_t make_constant(value val) {
 // second is the index at which the constant is found in the chunk's constant table.
 static void emit_constant(value val) {
     emit_bytes2(OP_CONSTANT, make_constant(val));
+}
+
+static void patch_jump(int offset) {
+    int jump = current_chunk()->count - offset - 2;
+
+    if (jump > UINT16_MAX) {
+        error("Too much code to jump over.");
+    }
+
+    current_chunk()->code[offset] = (jump >> 8) & 0xFF;
+    current_chunk()->code[offset + 1] = jump & 0xFF;
 }
 
 static void init_compiler(compiler* comp) {
@@ -556,6 +574,31 @@ static void block_statement(void) {
     consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' after block.");
 }
 
+static void if_statement(void) {
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after if statement.)");
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after if statement condition.)");
+
+    // The jif instruction is a 3-byte instrction.  The first byte is the instruction,
+    // and the next two bytes are the amount of bytes to skip over if the condition is
+    // false.  We initially set those two bytes as 0xFF as placeholders, but return the
+    // index into the bytecode where they reside.  Then, once we know how many bytes to
+    // skip by compiling the next statement(), we "backpatch" those two bytes.
+    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+    statement();
+    int else_jump = emit_jump(OP_JUMP);
+
+    patch_jump(then_jump);
+    emit_byte(OP_POP);
+
+    if (matches_token(TOKEN_ELSE)) {
+        statement();
+    }
+
+    patch_jump(else_jump);
+}
+
 static void declaration(void) {
     if (matches_token(TOKEN_VAR)) {
         variable_declaration();
@@ -571,6 +614,8 @@ static void declaration(void) {
 static void statement(void) {
     if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_IF)) {
+        if_statement();
     } else if (matches_token(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block_statement();
