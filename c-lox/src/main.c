@@ -1,4 +1,5 @@
 #include "virtual_machine.h"
+#include "common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +76,12 @@ int main(int argc, const char* argv[]) {
     if (argc == 1) {
         run_repl();
     } else if (argc == 2) {
+        run_file(argv[1]);
+    } else if (argc == 3) {
+        if (strcmp(argv[2], "--ndebug") == 0) {
+            debug_print_code      = false;
+            debug_trace_execution = false;
+        }
         run_file(argv[1]);
     } else {
         fprintf(stderr, "usage: clox [path]\n");
