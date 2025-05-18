@@ -70,22 +70,41 @@ static void run_file(const char* filepath) {
     }
 }
 
+static bool matches_ndebug(const char* candidate) {
+    return strcmp(candidate, "--ndebug") == 0;
+}
+
+static void turn_off_debug(void) {
+    debug_print_code = false;
+    debug_trace_execution = false;
+}
+
 int main(int argc, const char* argv[]) {
     init_virtual_machine();
 
     if (argc == 1) {
         run_repl();
     } else if (argc == 2) {
-        run_file(argv[1]);
-    } else if (argc == 3) {
-        if (strcmp(argv[2], "--ndebug") == 0) {
-            debug_print_code      = false;
-            debug_trace_execution = false;
+        if (matches_ndebug(argv[1])) {
+            turn_off_debug();
+            run_repl();
+        } else {
+            run_file(argv[1]);
         }
-        run_file(argv[1]);
+    } else if (argc == 3) {
+        int ndebug_index = -1;
+        if (matches_ndebug(argv[1])) {
+            ndebug_index = 1;
+            turn_off_debug();
+        } else if (matches_ndebug(argv[2])) {
+            ndebug_index = 2;
+            turn_off_debug();
+        }
+        int file_index = ndebug_index == 1 ? 2 : 1;
+        run_file(argv[file_index]);
     } else {
-        fprintf(stderr, "usage: clox [path]\n");
-        fprintf(stderr, "not providing path will run in repl mode\n");
+        fprintf(stderr, "usage: clox [path] [--ndebug]\n");
+        fprintf(stderr, "not providing path will run in repl mode.\n");
         exit(EXIT_FAILURE);
     }
 
