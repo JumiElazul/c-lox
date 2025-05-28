@@ -88,7 +88,17 @@ typedef struct {
     int depth;
 } local_variable;
 
+// The compiler holds an implicit "main" function. TYPE_SCRIPT is used to denote that 
+// function, while all user defined/standard library functions are defined with TYPE_FUNCTION.
+typedef enum {
+    TYPE_FUNCTION,
+    TYPE_SCRIPT,
+} function_type;
+
 typedef struct {
+    obj_function* function;
+    function_type type;
+
     local_variable locals[UINT8_COUNT];
     int local_count;
     int local_depth;
@@ -110,7 +120,7 @@ static void and_(bool can_assign);
 static void or_(bool can_assign);
 
 static bytecode_chunk* current_chunk(void) {
-    return compiling_chunk;
+    return &current_compiler->function->chunk;
 }
 
 static void error_at(token* tok, const char* msg) {
@@ -238,20 +248,36 @@ static void patch_jump(int offset) {
     current_chunk()->code[offset + 1] = jump & 0xFF;
 }
 
-static void init_compiler(compiler* comp) {
+static void init_compiler(compiler* comp, function_type type) {
+    comp->function = NULL;
+    comp->type = type;
     comp->local_count = 0;
     comp->scope_depth = 0;
+    comp->function = new_function();
     current_compiler = comp;
+
+    // The compiler claims stack slot 0 for the vm's own internal use.  It's name is empty
+    // so that the user can't write an identifier that refers to it.
+    local_variable* local = &current_compiler->locals[current_compiler->local_count++];
+    local->depth = 0;
+    local->name.start = "";
+    local->name.length = 0;
 }
 
-static void end_compiler(void) {
+static obj_function* end_compiler(void) {
     emit_return();
+    obj_function* function = current_compiler->function;
 
     if (debug_print_code) {
         if (!parser.had_error) {
-            disassemble_bytecode_chunk(current_chunk(), "code");
+            disassemble_bytecode_chunk(current_chunk(),
+                    function->name != NULL ?
+                    function->name->chars  :
+                    "<script>");
         }
     }
+
+    return function;
 }
 
 static void begin_scope(void) {
@@ -731,11 +757,10 @@ static void statement(void) {
     }
 }
 
-bool compile(const char* source, bytecode_chunk* chunk) {
+obj_function* compile(const char* source) {
     init_lexer(source);
     compiler compiler;
-    init_compiler(&compiler);
-    compiling_chunk = chunk;
+    init_compiler(&compiler, TYPE_SCRIPT);
 
     parser.had_error = false;
     parser.panic_mode = false;
@@ -746,7 +771,6 @@ bool compile(const char* source, bytecode_chunk* chunk) {
         declaration();
     }
 
-    consume_if_matches(TOKEN_EOF, "Expected end of expression.");
-    end_compiler();
-    return !parser.had_error;
+    obj_function* function = end_compiler();
+    return parser.had_error ? NULL : function;
 }
