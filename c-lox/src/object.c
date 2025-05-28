@@ -1,4 +1,5 @@
 #include "object.h"
+#include "bytecode_chunk.h"
 #include "hash_table.h"
 #include "memory.h"
 #include "value.h"
@@ -40,6 +41,14 @@ static uint32_t hash_string(const char* key, int length) {
     return hash;
 }
 
+obj_function* new_function(void) {
+    obj_function* function = ALLOCATE_OBJ(obj_function, OBJ_FUNCTION);
+    function->arity = 0;
+    function->name = NULL;
+    init_bytecode_chunk(&function->chunk);
+    return function;
+}
+
 // In this function we have already allocated the memory from the virtual machine for the string 
 // concatenation, and we just need to produce an obj_string* object from it.
 obj_string* take_string(char* chars, int length) {
@@ -69,10 +78,17 @@ obj_string* copy_string(const char* chars, int length) {
     return allocate_string(buffer, length, hash);
 }
 
+static void print_function(obj_function* function) {
+    printf("<fn %s>", function->name->chars);
+}
+
 void print_object(value val) {
     switch (OBJ_TYPE(val)) {
+        case OBJ_FUNCTION: {
+            print_function(AS_FUNCTION(val));
+        } break;
         case OBJ_STRING: {
             printf("%s", AS_CSTRING(val));
-        }
+        } break;
     }
 }
