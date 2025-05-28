@@ -31,7 +31,7 @@ static void free_object(obj* object) {
             obj_function* function = (obj_function*)object;
             free_bytecode_chunk(&function->chunk);
             FREE(obj_function, object);
-        }
+        } break;
         case OBJ_STRING: {
             obj_string* string = (obj_string*)object;
             FREE_ARRAY(char, string->chars, string->length + 1);
