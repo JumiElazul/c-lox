@@ -527,6 +527,9 @@ static uint8_t parse_variable(const char* err_msg) {
 
 static void mark_initialized(void) {
     compiler* c = current_compiler;
+    if (c->scope_depth == 0) {
+        return;
+    }
     c->locals[c->local_count - 1].depth = c->scope_depth;
 }
 
@@ -700,6 +703,27 @@ static void block_statement(void) {
     consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' after block.");
 }
 
+static void function(function_type type) {
+    compiler comp;
+    init_compiler(&comp, type);
+    begin_scope();
+
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after parameters.");
+    consume_if_matches(TOKEN_LEFT_BRACE, "Expected '{' before function body.");
+    block_statement();
+
+    obj_function* function = end_compiler();
+    emit_bytes2(OP_CONSTANT, make_constant(OBJ_VAL(function)));
+}
+
+static void function_declaration(void) {
+    uint8_t global = parse_variable("Expected function name.");
+    mark_initialized();
+    function(TYPE_FUNCTION);
+    define_variable(global);
+}
+
 static void if_statement(void) {
     consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after if statement.)");
     parse_expression();
@@ -728,7 +752,9 @@ static void if_statement(void) {
 }
 
 static void declaration(void) {
-    if (matches_token(TOKEN_VAR)) {
+    if (matches_token(TOKEN_FUNC)) {
+        function_declaration();
+    } else if (matches_token(TOKEN_VAR)) {
         variable_declaration();
     } else {
         statement();

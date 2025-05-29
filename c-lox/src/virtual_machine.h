@@ -2,14 +2,22 @@
 #define JUMI_CLOX_VIRTUAL_MACHINE_H
 #include "bytecode_chunk.h"
 #include "common.h"
+#include "object.h"
 #include "hash_table.h"
 #include "value.h"
 
-#define STACK_MAX 256
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
+
+typedef struct {
+    obj_function* function;
+    uint8_t* ip;
+    value* slots;
+} call_frame;
 
 typedef struct virtual_machine {
-    bytecode_chunk* current_chunk;
-    uint8_t* ip;
+    call_frame frames[FRAMES_MAX];
+    int frame_count;
     value stack[STACK_MAX];
     value* stack_top;
     hash_table global_variables;
