@@ -5,6 +5,7 @@
 #include "lexer.h"
 #include "object.h"
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -95,7 +96,8 @@ typedef enum {
     TYPE_SCRIPT,
 } function_type;
 
-typedef struct {
+typedef struct compiler {
+    struct compiler* enclosing_compiler;
     obj_function* function;
     function_type type;
 
@@ -249,12 +251,18 @@ static void patch_jump(int offset) {
 }
 
 static void init_compiler(compiler* comp, function_type type) {
+    comp->enclosing_compiler = current_compiler;
     comp->function = NULL;
     comp->type = type;
     comp->local_count = 0;
     comp->scope_depth = 0;
     comp->function = new_function();
     current_compiler = comp;
+
+    if (type != TYPE_SCRIPT) {
+        current_compiler->function->name = copy_string(
+                parser.previous.start, parser.previous.length);
+    }
 
     // The compiler claims stack slot 0 for the vm's own internal use.  It's name is empty
     // so that the user can't write an identifier that refers to it.
@@ -277,6 +285,7 @@ static obj_function* end_compiler(void) {
         }
     }
 
+    current_compiler = current_compiler->enclosing_compiler;
     return function;
 }
 
@@ -482,7 +491,7 @@ static int resolve_local(compiler* comp, token* name) {
 }
 
 static bool is_local_variable(void) {
-    return current_compiler->scope_depth > 0;
+    return current_compiler->scope_depth > 0; // <--
 }
 
 static void add_local_variable(token name) {
@@ -709,6 +718,16 @@ static void function(function_type type) {
     begin_scope();
 
     consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            ++current_compiler->function->arity;
+            if (current_compiler->function->arity > 255) {
+                error_at_current("Can't have more than 255 parameters.");
+            }
+            uint8_t constant = parse_variable("Expected parameter name.");
+            define_variable(constant);
+        } while (matches_token(TOKEN_COMMA));
+    }
     consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after parameters.");
     consume_if_matches(TOKEN_LEFT_BRACE, "Expected '{' before function body.");
     block_statement();
