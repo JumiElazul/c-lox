@@ -15,6 +15,7 @@ virtual_machine vm;
 
 static void reset_stack(void) {
     vm.stack_top = vm.stack;
+    vm.frame_count = 0;
 }
 
 static void runtime_error(const char* format, ...) {
@@ -24,8 +25,9 @@ static void runtime_error(const char* format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    size_t instruction = vm.ip - vm.current_chunk->code - 1;
-    int line = vm.current_chunk->lines[instruction];
+    call_frame* frame = &vm.frames[vm.frame_count - 1];
+    size_t instruction = frame->ip - frame->function->chunk.code - 1;
+    int line = frame->function->chunk.lines[instruction];
     fprintf(stderr, "[line %d] in script\n", line);
     reset_stack();
 }
@@ -77,11 +79,19 @@ static void concatenate(void) {
 }
 
 static interpret_result virtual_machine_run(void) {
-#define READ_BYTE() (*vm.ip++)
-#define READ_CONSTANT() (vm.current_chunk->constants.values[READ_BYTE()])
+    call_frame* frame = &vm.frames[vm.frame_count - 1];
+
+#define READ_BYTE() (*frame->ip++)
+
 #define READ_SHORT() \
-    (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
+    (frame->ip += 2, \
+    (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+
+#define READ_CONSTANT() \
+    (frame->function->chunk.constants.values[READ_BYTE()])
+
 #define READ_STRING() AS_STRING(READ_CONSTANT())
+
 #define BINARY_OP(value_type, op)                          \
     do {                                                   \
         if (!IS_NUMBER(virtual_machine_stack_peek(0)) ||   \
@@ -107,7 +117,7 @@ static interpret_result virtual_machine_run(void) {
                 printf("]");
             }
             printf("\n");
-            disassemble_instruction(vm.current_chunk, (int)(vm.ip - vm.current_chunk->code));
+            disassemble_instruction(&frame->function->chunk, (int)(frame->ip - frame->function->chunk.code));
         }
 
         uint8_t instruction;
@@ -130,11 +140,11 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                virtual_machine_stack_push(vm.stack[slot]);
+                virtual_machine_stack_push(frame->slots[slot]);
             } break;
             case OP_SET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                vm.stack[slot] = virtual_machine_stack_peek(0);
+                frame->slots[slot] = virtual_machine_stack_peek(0);
             } break;
             case OP_GET_GLOBAL: {
                 obj_string* name = READ_STRING();
@@ -205,17 +215,17 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_JUMP: {
                 uint16_t offset = READ_SHORT();
-                vm.ip += offset;
+                frame->ip += offset;
             } break;
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = READ_SHORT();
                 if (is_falsey(virtual_machine_stack_peek(0))) {
-                    vm.ip += offset;
+                    frame->ip += offset;
                 }
             } break;
             case OP_LOOP: {
                 uint16_t offset = READ_SHORT();
-                vm.ip -= offset;
+                frame->ip -= offset;
             } break;
             case OP_RETURN: {
                 return INTERPRET_OK;
@@ -224,26 +234,31 @@ static interpret_result virtual_machine_run(void) {
     }
 
 #undef READ_BYTE
-#undef READ_CONSTANT
 #undef READ_SHORT
+#undef READ_CONSTANT
 #undef READ_STRING
 #undef BINARY_OP
 }
 
+// First we pass the source code to the compiler.  It returns us an obj_function* containing
+// the compiled top level code.  If we get NULL, there was a reported compiler error.
+// Otherwise, we store the function on the stack and prepare an initial call_frame to execute
+// its code.  This is why we reserve the first index of the local_variables stack in the compiler
+// struct, to store this function.  In the new call_frame, we point to the functcion, initialize
+// its ip to point to the beginning of the function's bytecode, and set up its stack window to start
+// at the very bottom of the vm's value stack.
 interpret_result virtual_machine_interpret(const char* source) {
-    bytecode_chunk chunk;
-    init_bytecode_chunk(&chunk);
-
-    if (!compile(source, &chunk)) {
-        free_bytecode_chunk(&chunk);
+    obj_function* function = compile(source);
+    if (function == NULL) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    vm.current_chunk = &chunk;
-    vm.ip = vm.current_chunk->code;
+    virtual_machine_stack_push(OBJ_VAL(function));
+    call_frame* frame = &vm.frames[vm.frame_count++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    frame->slots = vm.stack;
 
-    interpret_result result = virtual_machine_run();
-    free_bytecode_chunk(&chunk);
-    return result;
+    return virtual_machine_run();
 }
 
