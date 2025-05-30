@@ -96,6 +96,7 @@ static void skip_whitespace(void) {
                     while (!is_at_end() && peek_current_char() != '\n') {
                         advance_lexer();
                     }
+                    break;
                 } else {
                     return;
                 }
