@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 // program              -> declaration* EOF ;
 // declaration          -> class_declaration | func_declaration | variable_declaration | statement ;
 // class_declaration    -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;

@@ -59,6 +59,28 @@ static value virtual_machine_stack_peek(int distance) {
     return vm.stack_top[-1 - distance];
 }
 
+static bool call(obj_function* function, int arg_count) {
+    call_frame* frame = &vm.frames[vm.frame_count++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    frame->slots = vm.stack_top - arg_count - 1;
+    return true;
+}
+
+static bool call_value(value callee, int arg_count) {
+    if (IS_OBJ(callee)) {
+        switch (OBJ_TYPE(callee)) {
+            case OBJ_FUNCTION: {
+                return call(AS_FUNCTION(callee), arg_count);
+            } break;
+            default:
+                break;
+        }
+    }
+    runtime_error("Can only call functions and classes.");
+    return false;
+}
+
 static bool is_falsey(value val) {
     // null and false are falsey, and everything else is truthy
     return IS_NULL(val) || (IS_BOOL(val) && !AS_BOOL(val));
@@ -226,6 +248,13 @@ static interpret_result virtual_machine_run(void) {
             case OP_LOOP: {
                 uint16_t offset = READ_SHORT();
                 frame->ip -= offset;
+            } break;
+            case OP_CALL: {
+                int arg_count = READ_BYTE();
+                if (!call_value(virtual_machine_stack_peek(arg_count), arg_count)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
             } break;
             case OP_RETURN: {
                 return INTERPRET_OK;
