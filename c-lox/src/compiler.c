@@ -626,6 +626,20 @@ static void print_statement(void) {
     emit_byte(OP_PRINT);
 }
 
+static void return_statement(void) {
+    if (current_compiler->type == TYPE_SCRIPT) {
+        error("Can't use 'return' statement from top-level code.");
+    }
+
+    if (matches_token(TOKEN_SEMICOLON)) {
+        emit_return();
+    } else {
+        parse_expression();
+        consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after return value.");
+        emit_byte(OP_RETURN);
+    }
+}
+
 static void while_statement(void) {
     int loop_start = current_chunk()->count;
     consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after while.");
@@ -773,7 +787,7 @@ static void if_statement(void) {
     parse_expression();
     consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after if statement condition.)");
 
-    // The jif instruction is a 3-byte instrction.  The first byte is the instruction,
+    // The jif instruction is a 3-byte instruction.  The first byte is the instruction,
     // and the next two bytes are the amount of bytes to skip over if the condition is
     // false.  We initially set those two bytes as 0xFF as placeholders, but return the
     // index into the bytecode where they reside.  Then, once we know how many bytes to
@@ -816,6 +830,8 @@ static void statement(void) {
         for_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();
+    } else if (matches_token(TOKEN_RETURN)) {
+        return_statement();
     } else if (matches_token(TOKEN_WHILE)) {
         while_statement();
     } else if (matches_token(TOKEN_LEFT_BRACE)) {
