@@ -217,6 +217,7 @@ static int emit_jump(uint8_t instruction) {
 } 
 
 static void emit_return(void) {
+    emit_byte(OP_NULL);
     emit_byte(OP_RETURN);
 }
 
@@ -496,7 +497,7 @@ static int resolve_local(compiler* comp, token* name) {
 }
 
 static bool is_local_variable(void) {
-    return current_compiler->scope_depth > 0; // <--
+    return current_compiler->scope_depth > 0;
 }
 
 static void add_local_variable(token name) {
@@ -511,6 +512,10 @@ static void add_local_variable(token name) {
 }
 
 static void declare_variable(void) {
+    if (!is_local_variable()) {
+        return;
+    }
+
     token* name = &parser.previous;
 
     for (int i = current_compiler->local_count - 1; i >= 0; --i) {

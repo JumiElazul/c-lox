@@ -25,10 +25,19 @@ static void runtime_error(const char* format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    call_frame* frame = &vm.frames[vm.frame_count - 1];
-    size_t instruction = frame->ip - frame->function->chunk.code - 1;
-    int line = frame->function->chunk.lines[instruction];
-    fprintf(stderr, "[line %d] in script\n", line);
+    for (int i = vm.frame_count - 1; i >= 0; --i) {
+        call_frame* frame = &vm.frames[i];
+        obj_function* function = frame->function;
+        size_t instruction = frame->ip - function->chunk.code - 1;
+        fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+
+        if (function->name == NULL) {
+            fprintf(stderr, "script\n");
+        } else {
+            fprintf(stderr, "%s()", function->name->chars);
+        }
+    }
+
     reset_stack();
 }
 
@@ -60,6 +69,16 @@ static value virtual_machine_stack_peek(int distance) {
 }
 
 static bool call(obj_function* function, int arg_count) {
+    if (arg_count != function->arity) {
+        runtime_error("Expected %d arguments but got %d", function->arity, arg_count);
+        return false;
+    }
+
+    if (vm.frame_count == FRAMES_MAX) {
+        runtime_error("== Stack overflow ==");
+        return false;
+    }
+
     call_frame* frame = &vm.frames[vm.frame_count++];
     frame->function = function;
     frame->ip = function->chunk.code;
@@ -257,7 +276,17 @@ static interpret_result virtual_machine_run(void) {
                 frame = &vm.frames[vm.frame_count - 1];
             } break;
             case OP_RETURN: {
-                return INTERPRET_OK;
+                value result = virtual_machine_stack_pop();
+                --vm.frame_count;
+
+                if (vm.frame_count == 0) {
+                    virtual_machine_stack_pop();
+                    return INTERPRET_OK;
+                }
+
+                vm.stack_top = frame->slots;
+                virtual_machine_stack_push(result);
+                frame = &vm.frames[vm.frame_count - 1];
             } break;
         }
     }
@@ -283,10 +312,7 @@ interpret_result virtual_machine_interpret(const char* source) {
     }
 
     virtual_machine_stack_push(OBJ_VAL(function));
-    call_frame* frame = &vm.frames[vm.frame_count++];
-    frame->function = function;
-    frame->ip = function->chunk.code;
-    frame->slots = vm.stack;
+    call(function, 0);
 
     return virtual_machine_run();
 }
