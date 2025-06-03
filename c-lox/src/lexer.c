@@ -167,7 +167,7 @@ static token make_identifier(void) {
 }
 
 static token make_number(void) {
-    // Advance until we find a non digit
+    // Advance until we find a non-digit
     while (is_digit(peek_current_char())) {
         advance_lexer();
     }
