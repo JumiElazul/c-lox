@@ -79,6 +79,10 @@ obj_string* copy_string(const char* chars, int length) {
 }
 
 static void print_function(obj_function* function) {
+    if (function->name == NULL) {
+        printf("<script>");
+        return;
+    }
     printf("<fn %s>", function->name->chars);
 }
 

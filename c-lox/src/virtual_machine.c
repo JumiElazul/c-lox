@@ -234,7 +234,7 @@ interpret_result virtual_machine_interpret(const char* source) {
     bytecode_chunk chunk;
     init_bytecode_chunk(&chunk);
 
-    if (!compile(source, &chunk)) {
+    if (!compile(source)) {
         free_bytecode_chunk(&chunk);
         return INTERPRET_COMPILE_ERROR;
     }

@@ -2,6 +2,6 @@
 #define JUMI_CLOX_COMPILER_H
 #include "bytecode_chunk.h"
 
-bool compile(const char* source, bytecode_chunk* chunk);
+bool compile(const char* source);
 
 #endif
