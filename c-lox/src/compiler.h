@@ -1,7 +1,7 @@
 #ifndef JUMI_CLOX_COMPILER_H
 #define JUMI_CLOX_COMPILER_H
-#include "bytecode_chunk.h"
+#include "object.h"
 
-bool compile(const char* source);
+obj_function* compile(const char* source);
 
 #endif

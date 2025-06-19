@@ -752,7 +752,7 @@ static void statement(void) {
     }
 }
 
-bool compile(const char* source) {
+obj_function* compile(const char* source) {
     init_lexer(source);
     compiler compiler;
     init_compiler(&compiler, TYPE_SCRIPT);
