@@ -38,7 +38,6 @@ u24_t deconstruct_u24_t(int index);
 int construct_u24_t(u24_t format);
 void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line);
 void write_constant(bytecode_chunk* chunk, value val, int line);
-int add_constant(bytecode_chunk* chunk, value val);
 int get_line(bytecode_chunk* chunk, int index);
 
 #endif

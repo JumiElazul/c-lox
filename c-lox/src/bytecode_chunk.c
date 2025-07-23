@@ -22,6 +22,12 @@ static void encode_line_run(bytecode_chunk* chunk, int line) {
     }
     chunk->line_runs[chunk->lr_count++] = (line_run){.line = line, .count = 1};
 }
+
+static int add_constant(bytecode_chunk* chunk, value val) {
+    write_to_value_array(&chunk->constants, val);
+    return chunk->constants.count - 1;
+}
+
 void init_bytecode_chunk(bytecode_chunk* chunk) {
     chunk->count = 0;
     chunk->capacity = 0;
@@ -70,11 +76,6 @@ void write_constant(bytecode_chunk* chunk, value val, int line) {
         write_to_bytecode_chunk(chunk, fmt.mid, line);
         write_to_bytecode_chunk(chunk, fmt.lo, line);
     }
-}
-
-int add_constant(bytecode_chunk* chunk, value val) {
-    write_to_value_array(&chunk->constants, val);
-    return chunk->constants.count - 1;
 }
 
 int get_line(bytecode_chunk* chunk, int instr_index) {
