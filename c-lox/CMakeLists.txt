@@ -1,5 +1,13 @@
 set(CLOX_SOURCES
     "src/main.c"
+    "src/common.h"
+
+    "src/bytecode_chunk.h"
+    "src/bytecode_chunk.c"
+    "src/disassembler.h"
+    "src/disassembler.c"
+    "src/memory.h"
+    "src/memory.c"
 )
 
 set(CLOX_EXE_NAME c-lox)
