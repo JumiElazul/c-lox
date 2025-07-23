@@ -20,9 +20,8 @@ static void encode_line_run(bytecode_chunk* chunk, int line) {
         chunk->lr_capacity = GROW_CAPACITY(old);
         chunk->line_runs = GROW_ARRAY(line_run, chunk->line_runs, old, chunk->lr_capacity);
     }
-    chunk->line_runs[chunk->lr_count++] = (line_run){ .line = line, .count = 1 };
+    chunk->line_runs[chunk->lr_count++] = (line_run){.line = line, .count = 1};
 }
-
 void init_bytecode_chunk(bytecode_chunk* chunk) {
     chunk->count = 0;
     chunk->capacity = 0;
@@ -40,6 +39,12 @@ void free_bytecode_chunk(bytecode_chunk* chunk) {
     init_bytecode_chunk(chunk);
 }
 
+u24_t deconstruct_u24_t(int index) {
+    return (u24_t){.hi = (index >> 16) & 0xFF, .mid = (index >> 8) & 0xFF, .lo = index & 0xFF};
+}
+
+int construct_u24_t(u24_t fmt) { return (fmt.hi << 16) | (fmt.mid << 8) | fmt.lo; }
+
 void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
     if (chunk->count >= chunk->capacity) {
         int old_capacity = chunk->capacity;
@@ -51,6 +56,20 @@ void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
     ++chunk->count;
 
     encode_line_run(chunk, line);
+}
+
+void write_constant(bytecode_chunk* chunk, value val, int line) {
+    int constant_index = add_constant(chunk, val);
+    if (constant_index <= 255) {
+        write_to_bytecode_chunk(chunk, OP_CONSTANT, line);
+        write_to_bytecode_chunk(chunk, constant_index, line);
+    } else {
+        write_to_bytecode_chunk(chunk, OP_CONSTANT_LONG, line);
+        u24_t fmt = deconstruct_u24_t(constant_index);
+        write_to_bytecode_chunk(chunk, fmt.hi, line);
+        write_to_bytecode_chunk(chunk, fmt.mid, line);
+        write_to_bytecode_chunk(chunk, fmt.lo, line);
+    }
 }
 
 int add_constant(bytecode_chunk* chunk, value val) {

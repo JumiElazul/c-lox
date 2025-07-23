@@ -1,6 +1,8 @@
 #include "disassembler.h"
+#include "bytecode_chunk.h"
 #include "value.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 void disassemble_chunk(bytecode_chunk* chunk, const char* name) {
     printf("== %s ==\n", name);
@@ -10,12 +12,26 @@ void disassemble_chunk(bytecode_chunk* chunk, const char* name) {
     }
 }
 
-static int constant_instruction(const char* name, bytecode_chunk* chunk, int offset) {
-    uint8_t constant = chunk->code[offset + 1];
-    printf("%-16s %4d '", name, constant);
+static int constant_instruction(const char* name, bytecode_chunk* chunk, int offset,
+                                bool is_long_instr) {
+    int constant;
+    if (is_long_instr) {
+        if (offset + 3 >= chunk->count) {
+            printf("Truncated OP_CONSTANT_LONG at %d\n", offset);
+            exit(EXIT_FAILURE);
+        }
+
+        uint8_t hi = chunk->code[offset + 1];
+        uint8_t mid = chunk->code[offset + 2];
+        uint8_t lo = chunk->code[offset + 3];
+        constant = construct_u24_t((u24_t){.hi = hi, .mid = mid, .lo = lo});
+    } else {
+        constant = chunk->code[offset + 1];
+    }
+    printf("%-16s %6d '", name, constant);
     print_value(chunk->constants.values[constant]);
     printf("'\n");
-    return offset + 2;
+    return is_long_instr ? offset + 4 : offset + 2;
 }
 
 static int simple_instruction(const char* name, int offset) {
@@ -24,19 +40,21 @@ static int simple_instruction(const char* name, int offset) {
 }
 
 int disassemble_instruction(bytecode_chunk* chunk, int offset) {
-    printf("%04d ", offset);
+    printf("%06d ", offset);
 
     int line = get_line(chunk, offset);
     if (offset > 0 && line == get_line(chunk, offset - 1)) {
-        printf("   | ");
+        printf("     | ");
     } else {
-        printf("%4d ", line);
+        printf("%6d ", line);
     }
 
     uint8_t instruction = chunk->code[offset];
     switch (instruction) {
         case OP_CONSTANT:
-            return constant_instruction("OP_CONSTANT", chunk, offset);
+            return constant_instruction("OP_CONSTANT", chunk, offset, false);
+        case OP_CONSTANT_LONG:
+            return constant_instruction("OP_CONSTANT_LONG", chunk, offset, true);
         case OP_RETURN:
             return simple_instruction("OP_RETURN", offset);
         default: {

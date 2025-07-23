@@ -24,6 +24,4 @@ void write_to_value_array(value_array* array, value val) {
     ++array->count;
 }
 
-void print_value(value val) {
-    printf("%g", val);
-}
+void print_value(value val) { printf("%g", val); }
