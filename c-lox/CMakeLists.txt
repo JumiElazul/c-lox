@@ -8,6 +8,8 @@ set(CLOX_SOURCES
     "src/disassembler.c"
     "src/memory.h"
     "src/memory.c"
+    "src/value.h"
+    "src/value.c"
 )
 
 set(CLOX_EXE_NAME c-lox)
