@@ -10,3 +10,4 @@ project(c-lox VERSION 0.0.1 LANGUAGES C)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory(c-lox)
+# add_subdirectory(c-lox-asm)
