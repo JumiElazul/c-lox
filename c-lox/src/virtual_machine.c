@@ -1,5 +1,6 @@
 #include "virtual_machine.h"
 #include "bytecode_chunk.h"
+#include "compiler.h"
 #include "disassembler.h"
 #include "value.h"
 #include <stdio.h>
@@ -56,7 +57,7 @@ static interpret_result virtual_machine_run(void) {
                 printf("\n");
             } break;
             case OP_NEGATE: {
-                virtual_machine_stack_push(-virtual_machine_stack_pop());
+                *(vm.stack_top - 1) = -(*(vm.stack_top - 1));
             } break;
             case OP_ADD: {
                 BINARY_OP(+);
@@ -87,10 +88,9 @@ static interpret_result virtual_machine_run(void) {
 #undef BINARY_OP
 }
 
-interpret_result virtual_machine_interpret(bytecode_chunk* chunk) {
-    vm.chunk = chunk;
-    vm.ip = vm.chunk->code;
-    return virtual_machine_run();
+interpret_result virtual_machine_interpret(const char* source_code) {
+    compile(source_code);
+    return INTERPRET_OK;
 }
 
 void virtual_machine_stack_push(value val) {
