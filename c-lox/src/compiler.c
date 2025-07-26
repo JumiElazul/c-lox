@@ -13,7 +13,7 @@ void compile(const char* source_code) {
             printf("%6d ", tok.line);
             line = tok.line;
         } else {
-            printf("     |");
+            printf("     | ");
         }
         printf("%2d '%.*s'\n", tok.type, tok.length, tok.start);
 
