@@ -3,6 +3,7 @@
 #include "virtual_machine.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef enum {
     ERR_FILE_UNOPENABLE = 1,
@@ -18,6 +19,12 @@ static void run_repl(void) {
 
         if (!fgets(line, sizeof(line), stdin)) {
             printf("\n");
+            break;
+        }
+
+        line[strcspn(line, "\r\n")] = '\0';
+
+        if (strcmp(line, "q") == 0 || strcmp(line, "quit") == 0) {
             break;
         }
 
