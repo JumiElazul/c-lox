@@ -1,5 +1,6 @@
 #include "virtual_machine.h"
 #include "bytecode_chunk.h"
+#include "compiler.h"
 #include "disassembler.h"
 #include "value.h"
 #include <stdio.h>
@@ -51,12 +52,12 @@ static interpret_result virtual_machine_run(void) {
                 u24_index.hi = READ_BYTE();
                 u24_index.mid = READ_BYTE();
                 u24_index.lo = READ_BYTE();
-                int reconstructed_index = construct_u24_t(u24_index);
+                int reconstructed_index = deconstruct_u24_t(u24_index);
                 virtual_machine_stack_push(vm.chunk->constants.values[reconstructed_index]);
                 printf("\n");
             } break;
             case OP_NEGATE: {
-                virtual_machine_stack_push(-virtual_machine_stack_pop());
+                *(vm.stack_top - 1) = -(*(vm.stack_top - 1));
             } break;
             case OP_ADD: {
                 BINARY_OP(+);
@@ -75,6 +76,10 @@ static interpret_result virtual_machine_run(void) {
                 printf("\n");
                 return INTERPRET_OK;
             }
+            default: {
+                printf("Unknown opcode %d\n", instruction);
+                return INTERPRET_RUNTIME_ERROR;
+            } break;
         }
     }
 
@@ -83,10 +88,22 @@ static interpret_result virtual_machine_run(void) {
 #undef BINARY_OP
 }
 
-interpret_result virtual_machine_interpret(bytecode_chunk* chunk) {
-    vm.chunk = chunk;
+interpret_result virtual_machine_interpret(const char* source_code) {
+    bytecode_chunk chunk;
+    init_bytecode_chunk(&chunk);
+
+    if (!compile(source_code, &chunk)) {
+        free_bytecode_chunk(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    vm.chunk = &chunk;
     vm.ip = vm.chunk->code;
-    return virtual_machine_run();
+
+    interpret_result result = virtual_machine_run();
+    free_bytecode_chunk(&chunk);
+
+    return result;
 }
 
 void virtual_machine_stack_push(value val) {
