@@ -56,6 +56,7 @@ typedef struct {
 } token;
 
 void init_lexer(const char* source_code);
+char advance_lexer(void);
 token lexer_scan_token(void);
 
 #endif

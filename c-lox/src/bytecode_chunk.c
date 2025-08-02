@@ -45,11 +45,11 @@ void free_bytecode_chunk(bytecode_chunk* chunk) {
     init_bytecode_chunk(chunk);
 }
 
-u24_t deconstruct_u24_t(int index) {
+u24_t construct_u24_t(int index) {
     return (u24_t){.hi = (index >> 16) & 0xFF, .mid = (index >> 8) & 0xFF, .lo = index & 0xFF};
 }
 
-int construct_u24_t(u24_t fmt) { return (fmt.hi << 16) | (fmt.mid << 8) | fmt.lo; }
+int deconstruct_u24_t(u24_t fmt) { return (fmt.hi << 16) | (fmt.mid << 8) | fmt.lo; }
 
 void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
     if (chunk->count >= chunk->capacity) {
@@ -71,7 +71,7 @@ void write_constant(bytecode_chunk* chunk, value val, int line) {
         write_to_bytecode_chunk(chunk, constant_index, line);
     } else {
         write_to_bytecode_chunk(chunk, OP_CONSTANT_LONG, line);
-        u24_t fmt = deconstruct_u24_t(constant_index);
+        u24_t fmt = construct_u24_t(constant_index);
         write_to_bytecode_chunk(chunk, fmt.hi, line);
         write_to_bytecode_chunk(chunk, fmt.mid, line);
         write_to_bytecode_chunk(chunk, fmt.lo, line);

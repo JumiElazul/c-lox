@@ -52,7 +52,7 @@ static interpret_result virtual_machine_run(void) {
                 u24_index.hi = READ_BYTE();
                 u24_index.mid = READ_BYTE();
                 u24_index.lo = READ_BYTE();
-                int reconstructed_index = construct_u24_t(u24_index);
+                int reconstructed_index = deconstruct_u24_t(u24_index);
                 virtual_machine_stack_push(vm.chunk->constants.values[reconstructed_index]);
                 printf("\n");
             } break;
@@ -89,8 +89,21 @@ static interpret_result virtual_machine_run(void) {
 }
 
 interpret_result virtual_machine_interpret(const char* source_code) {
-    compile(source_code);
-    return INTERPRET_OK;
+    bytecode_chunk chunk;
+    init_bytecode_chunk(&chunk);
+
+    if (!compile(source_code, &chunk)) {
+        free_bytecode_chunk(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    vm.chunk = &chunk;
+    vm.ip = vm.chunk->code;
+
+    interpret_result result = virtual_machine_run();
+    free_bytecode_chunk(&chunk);
+
+    return result;
 }
 
 void virtual_machine_stack_push(value val) {

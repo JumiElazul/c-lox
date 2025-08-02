@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "common.h"
+#include <stdbool.h>
 #include <string.h>
 
 typedef struct {
@@ -14,6 +15,11 @@ void init_lexer(const char* source_code) {
     lex.start = source_code;
     lex.current = source_code;
     lex.line = 1;
+}
+
+char advance_lexer(void) {
+    ++lex.current;
+    return lex.current[-1];
 }
 
 static bool is_alpha(char c) {
@@ -38,11 +44,6 @@ static token error_token(const char* message) {
     tok.length = (int)strlen(message);
     tok.line = lex.line;
     return tok;
-}
-
-static char advance_lexer(void) {
-    ++lex.current;
-    return lex.current[-1];
 }
 
 static bool is_at_end(void) { return *lex.current == '\0'; }

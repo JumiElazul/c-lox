@@ -24,7 +24,7 @@ static int constant_instruction(const char* name, bytecode_chunk* chunk, int off
         uint8_t hi = chunk->code[offset + 1];
         uint8_t mid = chunk->code[offset + 2];
         uint8_t lo = chunk->code[offset + 3];
-        constant = construct_u24_t((u24_t){.hi = hi, .mid = mid, .lo = lo});
+        constant = deconstruct_u24_t((u24_t){.hi = hi, .mid = mid, .lo = lo});
     } else {
         constant = chunk->code[offset + 1];
     }
