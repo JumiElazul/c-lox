@@ -55,6 +55,12 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
             return constant_instruction("OP_CONSTANT", chunk, offset, false);
         case OP_CONSTANT_LONG:
             return constant_instruction("OP_CONSTANT_LONG", chunk, offset, true);
+        case OP_NULL:
+            return simple_instruction("OP_NULL", offset);
+        case OP_TRUE:
+            return simple_instruction("OP_TRUE", offset);
+        case OP_FALSE:
+            return simple_instruction("OP_FALSE", offset);
         case OP_ADD:
             return simple_instruction("OP_ADD", offset);
         case OP_SUBTRACT:
@@ -63,6 +69,8 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
             return simple_instruction("OP_MULTIPLY", offset);
         case OP_DIVIDE:
             return simple_instruction("OP_DIVIDE", offset);
+        case OP_NOT:
+            return simple_instruction("OP_NOT", offset);
         case OP_NEGATE:
             return simple_instruction("OP_NEGATE", offset);
         case OP_RETURN:

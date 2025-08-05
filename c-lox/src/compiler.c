@@ -30,7 +30,7 @@ typedef enum {
     PREC_PRIMARY,
 } precedence;
 
-typedef void (*parse_fn)();
+typedef void (*parse_fn)(void);
 
 typedef struct {
     parse_fn prefix;
@@ -129,7 +129,7 @@ static void end_compilation(void) {
 #endif
 }
 
-static void parse_expression();
+static void parse_expression(void);
 static parse_rule* get_rule(token_type type);
 static void parse_precedence(precedence prec);
 
@@ -139,6 +139,24 @@ static void binary(void) {
     parse_precedence((precedence)(rule->prec + 1));
 
     switch (operator_type) {
+        case TOKEN_BANG_EQUAL:
+            emit_bytes2(OP_EQUAL, OP_NOT);
+            break;
+        case TOKEN_EQUAL_EQUAL:
+            emit_byte(OP_EQUAL);
+            break;
+        case TOKEN_GREATER:
+            emit_byte(OP_GREATER);
+            break;
+        case TOKEN_GREATER_EQUAL:
+            emit_bytes2(OP_LESS, OP_NOT);
+            break;
+        case TOKEN_LESS:
+            emit_byte(OP_LESS);
+            break;
+        case TOKEN_LESS_EQUAL:
+            emit_bytes2(OP_GREATER, OP_NOT);
+            break;
         case TOKEN_PLUS:
             emit_byte(OP_ADD);
             break;
@@ -156,6 +174,22 @@ static void binary(void) {
     }
 }
 
+static void literal(void) {
+    switch (parser.previous.type) {
+        case TOKEN_NULL: {
+            emit_byte(OP_NULL);
+        } break;
+        case TOKEN_TRUE: {
+            emit_byte(OP_TRUE);
+        } break;
+        case TOKEN_FALSE: {
+            emit_byte(OP_FALSE);
+        } break;
+        default:
+            return;
+    }
+}
+
 static void grouping(void) {
     parse_expression();
     consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
@@ -166,12 +200,15 @@ static void number(void) {
     emit_constant(NUMBER_VALUE(val));
 }
 
-static void unary() {
+static void unary(void) {
     token_type operator_type = parser.previous.type;
 
     parse_precedence(PREC_UNARY);
 
     switch (operator_type) {
+        case TOKEN_BANG: {
+            emit_byte(OP_NOT);
+        } break;
         case TOKEN_MINUS: {
             emit_byte(OP_NEGATE);
         } break;
@@ -192,31 +229,31 @@ parse_rule rules[] = {
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_BANG] = {NULL, NULL, PREC_NONE},
-    [TOKEN_BANG_EQUAL] = {NULL, NULL, PREC_NONE},
+    [TOKEN_BANG] = {unary, NULL, PREC_NONE},
+    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
     [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
-    [TOKEN_EQUAL_EQUAL] = {NULL, NULL, PREC_NONE},
-    [TOKEN_GREATER] = {NULL, NULL, PREC_NONE},
-    [TOKEN_GREATER_EQUAL] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LESS] = {NULL, NULL, PREC_NONE},
-    [TOKEN_LESS_EQUAL] = {NULL, NULL, PREC_NONE},
+    [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_EQUALITY},
+    [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_IDENTIFIER] = {NULL, NULL, PREC_NONE},
     [TOKEN_STRING] = {NULL, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FALSE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
     [TOKEN_FUNC] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
-    [TOKEN_NULL] = {NULL, NULL, PREC_NONE},
+    [TOKEN_NULL] = {literal, NULL, PREC_NONE},
     [TOKEN_OR] = {NULL, NULL, PREC_NONE},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
     [TOKEN_THIS] = {NULL, NULL, PREC_NONE},
-    [TOKEN_TRUE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},

@@ -1,6 +1,5 @@
 #include "bytecode_chunk.h"
 #include "clox_value.h"
-#include "common.h"
 #include "memory.h"
 #include <stdlib.h>
 

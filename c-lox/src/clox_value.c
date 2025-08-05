@@ -2,6 +2,23 @@
 #include "memory.h"
 #include <stdio.h>
 
+bool values_equal(clox_value a, clox_value b) {
+    if (a.type != b.type) {
+        return false;
+    }
+
+    switch (a.type) {
+        case CLOX_VAL_BOOL:
+            return AS_BOOL(a) == AS_BOOL(b);
+        case CLOX_VAL_NULL:
+            return true;
+        case CLOX_VAL_NUMBER:
+            return AS_NUMBER(a) == AS_NUMBER(b);
+        default:
+            return false;
+    }
+}
+
 void init_value_array(value_array* array) {
     array->count = 0;
     array->capacity = 0;
@@ -24,4 +41,16 @@ void write_to_value_array(value_array* array, clox_value val) {
     ++array->count;
 }
 
-void print_value(clox_value val) { printf("%g", AS_NUMBER(val)); }
+void print_value(clox_value val) {
+    switch (val.type) {
+        case CLOX_VAL_BOOL: {
+            printf(AS_BOOL(val) ? "true" : "false");
+        } break;
+        case CLOX_VAL_NULL: {
+            printf("null");
+        } break;
+        case CLOX_VAL_NUMBER: {
+            printf("%g", AS_NUMBER(val));
+        } break;
+    }
+}

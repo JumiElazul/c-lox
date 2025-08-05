@@ -24,6 +24,10 @@ static void runtime_error(const char* format, ...) {
 
 static clox_value virtual_machine_stack_peek(int distance) { return vm.stack_top[-1 - distance]; }
 
+static bool is_falsey(clox_value value) {
+    return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
 void init_virtual_machine(void) { reset_stack(); }
 
 void free_virtual_machine(void) {}
@@ -87,6 +91,26 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(vm.chunk->constants.values[reconstructed_index]);
                 printf("\n");
             } break;
+            case OP_NULL: {
+                virtual_machine_stack_push(NULL_VALUE);
+            } break;
+            case OP_TRUE: {
+                virtual_machine_stack_push(BOOL_VALUE(true));
+            } break;
+            case OP_FALSE: {
+                virtual_machine_stack_push(BOOL_VALUE(false));
+            } break;
+            case OP_EQUAL: {
+                clox_value b = virtual_machine_stack_pop();
+                clox_value a = virtual_machine_stack_pop();
+                virtual_machine_stack_push(BOOL_VALUE(values_equal(a, b)));
+            } break;
+            case OP_GREATER: {
+
+            } break;
+            case OP_LESS: {
+
+            } break;
             case OP_NEGATE: {
                 if (!IS_NUMBER(virtual_machine_stack_peek(0))) {
                     runtime_error("Operand must be a number");
@@ -105,6 +129,9 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_DIVIDE: {
                 BINARY_OP(NUMBER_VALUE, /);
+            } break;
+            case OP_NOT: {
+                virtual_machine_stack_push(BOOL_VALUE(is_falsey(virtual_machine_stack_pop())));
             } break;
             case OP_RETURN: {
                 print_value(virtual_machine_stack_pop());

@@ -24,7 +24,7 @@ typedef struct {
 #define AS_NUMBER(val) ((val).as.number)
 
 #define BOOL_VALUE(val) ((clox_value){CLOX_VAL_BOOL, {.boolean = val}})
-#define NULL_VALUE(val) ((clox_value){CLOX_VAL_NULL, {.number = 0}})
+#define NULL_VALUE ((clox_value){CLOX_VAL_NULL, {.number = 0}})
 #define NUMBER_VALUE(val) ((clox_value){CLOX_VAL_NUMBER, {.number = val}})
 
 typedef struct {
@@ -33,6 +33,7 @@ typedef struct {
     clox_value* values;
 } value_array;
 
+bool values_equal(clox_value a, clox_value b);
 void init_value_array(value_array* array);
 void free_value_array(value_array* array);
 void write_to_value_array(value_array* array, clox_value val);

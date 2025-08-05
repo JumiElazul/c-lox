@@ -1,17 +1,23 @@
 #ifndef JUMI_CLOX_BYTECODE_CHUNK_H
 #define JUMI_CLOX_BYTECODE_CHUNK_H
 #include "clox_value.h"
-#include "common.h"
 
 #define U24T_MAX 0xFFFFFFu
 
 typedef enum {
     OP_CONSTANT,
     OP_CONSTANT_LONG,
+    OP_NULL,
+    OP_TRUE,
+    OP_FALSE,
+    OP_EQUAL,
+    OP_GREATER,
+    OP_LESS,
     OP_ADD,
     OP_SUBTRACT,
     OP_MULTIPLY,
     OP_DIVIDE,
+    OP_NOT,
     OP_NEGATE,
     OP_RETURN,
 } opcode;
