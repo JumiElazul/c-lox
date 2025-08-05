@@ -106,10 +106,10 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(BOOL_VALUE(values_equal(a, b)));
             } break;
             case OP_GREATER: {
-
+                BINARY_OP(BOOL_VALUE, >);
             } break;
             case OP_LESS: {
-
+                BINARY_OP(BOOL_VALUE, <);
             } break;
             case OP_NEGATE: {
                 if (!IS_NUMBER(virtual_machine_stack_peek(0))) {
