@@ -1,4 +1,4 @@
-#include "value.h"
+#include "clox_value.h"
 #include "memory.h"
 #include <stdio.h>
 
@@ -13,15 +13,15 @@ void free_value_array(value_array* array) {
     init_value_array(array);
 }
 
-void write_to_value_array(value_array* array, value val) {
+void write_to_value_array(value_array* array, clox_value val) {
     if (array->count >= array->capacity) {
         int old_capacity = array->capacity;
         array->capacity = GROW_CAPACITY(old_capacity);
-        array->values = GROW_ARRAY(value, array->values, old_capacity, array->capacity);
+        array->values = GROW_ARRAY(clox_value, array->values, old_capacity, array->capacity);
     }
 
     array->values[array->count] = val;
     ++array->count;
 }
 
-void print_value(value val) { printf("%g", val); }
+void print_value(clox_value val) { printf("%g", AS_NUMBER(val)); }

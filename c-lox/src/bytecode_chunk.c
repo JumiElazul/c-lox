@@ -1,7 +1,7 @@
 #include "bytecode_chunk.h"
+#include "clox_value.h"
 #include "common.h"
 #include "memory.h"
-#include "value.h"
 #include <stdlib.h>
 
 static void encode_line_run(bytecode_chunk* chunk, int line) {
@@ -23,7 +23,7 @@ static void encode_line_run(bytecode_chunk* chunk, int line) {
     chunk->line_runs[chunk->lr_count++] = (line_run){.line = line, .count = 1};
 }
 
-static int add_constant(bytecode_chunk* chunk, value val) {
+static int add_constant(bytecode_chunk* chunk, clox_value val) {
     write_to_value_array(&chunk->constants, val);
     return chunk->constants.count - 1;
 }
@@ -64,7 +64,7 @@ void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
     encode_line_run(chunk, line);
 }
 
-void write_constant(bytecode_chunk* chunk, value val, int line) {
+void write_constant(bytecode_chunk* chunk, clox_value val, int line) {
     int constant_index = add_constant(chunk, val);
     if (constant_index <= 255) {
         write_to_bytecode_chunk(chunk, OP_CONSTANT, line);

@@ -12,8 +12,8 @@ set(CLOX_SOURCES
     "src/lexer.c"
     "src/memory.h"
     "src/memory.c"
-    "src/value.h"
-    "src/value.c"
+    "src/clox_value.h"
+    "src/clox_value.c"
     "src/virtual_machine.h"
     "src/virtual_machine.c"
 )

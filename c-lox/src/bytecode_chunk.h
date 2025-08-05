@@ -1,7 +1,7 @@
 #ifndef JUMI_CLOX_BYTECODE_CHUNK_H
 #define JUMI_CLOX_BYTECODE_CHUNK_H
+#include "clox_value.h"
 #include "common.h"
-#include "value.h"
 
 #define U24T_MAX 0xFFFFFFu
 
@@ -44,7 +44,7 @@ void free_bytecode_chunk(bytecode_chunk* chunk);
 u24_t construct_u24_t(int index);
 int deconstruct_u24_t(u24_t format);
 void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line);
-void write_constant(bytecode_chunk* chunk, value val, int line);
+void write_constant(bytecode_chunk* chunk, clox_value val, int line);
 int get_line(bytecode_chunk* chunk, int index);
 
 #endif

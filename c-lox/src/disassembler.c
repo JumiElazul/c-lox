@@ -1,6 +1,6 @@
 #include "disassembler.h"
 #include "bytecode_chunk.h"
-#include "value.h"
+#include "clox_value.h"
 #include <stdio.h>
 #include <stdlib.h>
 

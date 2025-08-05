@@ -116,7 +116,9 @@ static void emit_bytes4(uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byt
 
 static void emit_return(void) { emit_byte(OP_RETURN); }
 
-static void emit_constant(value val) { write_constant(current_chunk(), val, parser.previous.line); }
+static void emit_constant(clox_value val) {
+    write_constant(current_chunk(), val, parser.previous.line);
+}
 
 static void end_compilation(void) {
     emit_return();
@@ -161,7 +163,7 @@ static void grouping(void) {
 
 static void number(void) {
     double val = strtod(parser.previous.start, NULL);
-    emit_constant(val);
+    emit_constant(NUMBER_VALUE(val));
 }
 
 static void unary() {

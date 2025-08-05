@@ -1,15 +1,15 @@
 #ifndef JUMI_CLOX_VIRTUAL_MACHINE_H
 #define JUMI_CLOX_VIRTUAL_MACHINE_H
 #include "bytecode_chunk.h"
-#include "value.h"
+#include "clox_value.h"
 
 #define STACK_MAX 256
 
 typedef struct {
     bytecode_chunk* chunk;
     uint8_t* ip;
-    value stack[STACK_MAX];
-    value* stack_top;
+    clox_value stack[STACK_MAX];
+    clox_value* stack_top;
 } virtual_machine;
 
 typedef enum {
@@ -20,8 +20,8 @@ typedef enum {
 
 void init_virtual_machine(void);
 void free_virtual_machine(void);
+void virtual_machine_stack_push(clox_value val);
+clox_value virtual_machine_stack_pop(void);
 interpret_result virtual_machine_interpret(const char* source_code);
-void virtual_machine_stack_push(value val);
-value virtual_machine_stack_pop(void);
 
 #endif
