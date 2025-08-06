@@ -10,6 +10,7 @@ typedef struct {
     uint8_t* ip;
     clox_value stack[STACK_MAX];
     clox_value* stack_top;
+    object* objects;
 } virtual_machine;
 
 typedef enum {
@@ -17,6 +18,8 @@ typedef enum {
     INTERPRET_COMPILE_ERROR,
     INTERPRET_RUNTIME_ERROR,
 } interpret_result;
+
+extern virtual_machine vm;
 
 void init_virtual_machine(void);
 void free_virtual_machine(void);

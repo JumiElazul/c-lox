@@ -1,4 +1,6 @@
 #include "memory.h"
+#include "clox_object.h"
+#include "virtual_machine.h"
 #include <stdlib.h>
 
 // oldSize           newSize                  Operation
@@ -17,4 +19,23 @@ void* reallocate(void* pointer, size_t old_size, size_t new_size) {
         exit(EXIT_FAILURE);
     }
     return result;
+}
+
+static void free_object(object* obj) {
+    switch (obj->type) {
+        case OBJECT_STRING: {
+            object_string* string = (object_string*)obj;
+            FREE_ARRAY(char, string->chars, string->length);
+            FREE(object_string, obj);
+        } break;
+    }
+}
+
+void free_objects(void) {
+    object* obj = vm.objects;
+    while (obj != NULL) {
+        object* next = obj->next;
+        free_object(obj);
+        obj = next;
+    }
 }

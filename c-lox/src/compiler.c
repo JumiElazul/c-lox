@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "bytecode_chunk.h"
+#include "clox_object.h"
 #include "common.h"
 #include "lexer.h"
 #include <stdio.h>
@@ -200,6 +201,10 @@ static void number(void) {
     emit_constant(NUMBER_VALUE(val));
 }
 
+static void string(void) {
+    emit_constant(OBJECT_VALUE(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
+}
+
 static void unary(void) {
     token_type operator_type = parser.previous.type;
 
@@ -238,7 +243,7 @@ parse_rule rules[] = {
     [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_IDENTIFIER] = {NULL, NULL, PREC_NONE},
-    [TOKEN_STRING] = {NULL, NULL, PREC_NONE},
+    [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},

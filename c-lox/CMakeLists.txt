@@ -14,6 +14,8 @@ set(CLOX_SOURCES
     "src/memory.c"
     "src/clox_value.h"
     "src/clox_value.c"
+    "src/clox_object.h"
+    "src/clox_object.c"
     "src/virtual_machine.h"
     "src/virtual_machine.c"
 )

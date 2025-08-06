@@ -1,10 +1,13 @@
 #include "virtual_machine.h"
 #include "bytecode_chunk.h"
+#include "clox_object.h"
 #include "clox_value.h"
 #include "compiler.h"
 #include "disassembler.h"
+#include "memory.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 virtual_machine vm;
 
@@ -28,9 +31,26 @@ static bool is_falsey(clox_value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
-void init_virtual_machine(void) { reset_stack(); }
+static void concatenate_string(void) {
+    object_string* b = AS_STRING(virtual_machine_stack_pop());
+    object_string* a = AS_STRING(virtual_machine_stack_pop());
 
-void free_virtual_machine(void) {}
+    int length = b->length + a->length;
+    char* chars = ALLOCATE(char, length + 1);
+    memcpy(chars, a->chars, a->length);
+    memcpy(chars + a->length, b->chars, b->length);
+    chars[length] = '\0';
+
+    object_string* result = take_string(chars, length);
+    virtual_machine_stack_push(OBJECT_VALUE(result));
+}
+
+void init_virtual_machine(void) {
+    reset_stack();
+    vm.objects = NULL;
+}
+
+void free_virtual_machine(void) { free_objects(); }
 
 void virtual_machine_stack_push(clox_value val) {
     // Maybe handle stack overflow here.
@@ -111,15 +131,17 @@ static interpret_result virtual_machine_run(void) {
             case OP_LESS: {
                 BINARY_OP(BOOL_VALUE, <);
             } break;
-            case OP_NEGATE: {
-                if (!IS_NUMBER(virtual_machine_stack_peek(0))) {
-                    runtime_error("Operand must be a number");
+            case OP_ADD: {
+                if (IS_STRING(virtual_machine_stack_peek(0)) &&
+                    IS_STRING(virtual_machine_stack_peek(1))) {
+                    concatenate_string();
+                } else if (IS_NUMBER(virtual_machine_stack_peek(0)) &&
+                           IS_NUMBER(virtual_machine_stack_peek(1))) {
+                    BINARY_OP(NUMBER_VALUE, +);
+                } else {
+                    runtime_error("Operands must be two numbers or two strings.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                virtual_machine_stack_push(NUMBER_VALUE(-AS_NUMBER(virtual_machine_stack_pop())));
-            } break;
-            case OP_ADD: {
-                BINARY_OP(NUMBER_VALUE, +);
             } break;
             case OP_SUBTRACT: {
                 BINARY_OP(NUMBER_VALUE, -);
@@ -132,6 +154,13 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_NOT: {
                 virtual_machine_stack_push(BOOL_VALUE(is_falsey(virtual_machine_stack_pop())));
+            } break;
+            case OP_NEGATE: {
+                if (!IS_NUMBER(virtual_machine_stack_peek(0))) {
+                    runtime_error("Operand must be a number");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                virtual_machine_stack_push(NUMBER_VALUE(-AS_NUMBER(virtual_machine_stack_pop())));
             } break;
             case OP_RETURN: {
                 print_value(virtual_machine_stack_pop());
