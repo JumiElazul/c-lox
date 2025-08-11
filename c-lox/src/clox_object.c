@@ -22,6 +22,7 @@ static object_string* allocate_string(char* chars, int length, uint32_t hash) {
     string->length = length;
     string->chars = chars;
     string->hash = hash;
+    hash_table_set(&vm.interned_strings, string, NULL_VALUE);
     return string;
 }
 
@@ -36,12 +37,25 @@ static uint32_t hash_string(const char* key, int length) {
 
 object_string* take_string(char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
+
+    object_string* interned = table_find_string(&vm.interned_strings, chars, length, hash);
+    if (interned != NULL) {
+        FREE_ARRAY(char, chars, length + 1);
+        return interned;
+    }
+
     return allocate_string(chars, length, hash);
 }
 
 // Allocates memory for const char* strings.
 object_string* copy_string(const char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
+
+    object_string* interned = table_find_string(&vm.interned_strings, chars, length, hash);
+    if (interned != NULL) {
+        return interned;
+    }
+
     char* heap_chars = ALLOCATE(char, length + 1);
     memcpy(heap_chars, chars, length);
     heap_chars[length] = '\0';

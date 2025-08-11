@@ -48,9 +48,13 @@ static void concatenate_string(void) {
 void init_virtual_machine(void) {
     reset_stack();
     vm.objects = NULL;
+    init_hash_table(&vm.interned_strings);
 }
 
-void free_virtual_machine(void) { free_objects(); }
+void free_virtual_machine(void) {
+    free_hash_table(&vm.interned_strings);
+    free_objects();
+}
 
 void virtual_machine_stack_push(clox_value val) {
     // Maybe handle stack overflow here.

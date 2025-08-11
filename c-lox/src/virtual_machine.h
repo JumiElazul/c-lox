@@ -2,6 +2,7 @@
 #define JUMI_CLOX_VIRTUAL_MACHINE_H
 #include "bytecode_chunk.h"
 #include "clox_value.h"
+#include "hash_table.h"
 
 #define STACK_MAX 256
 
@@ -10,6 +11,7 @@ typedef struct {
     uint8_t* ip;
     clox_value stack[STACK_MAX];
     clox_value* stack_top;
+    hash_table interned_strings;
     object* objects;
 } virtual_machine;
 

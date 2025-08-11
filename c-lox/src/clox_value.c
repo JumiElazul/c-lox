@@ -17,10 +17,7 @@ bool values_equal(clox_value a, clox_value b) {
         case CLOX_VAL_NUMBER:
             return AS_NUMBER(a) == AS_NUMBER(b);
         case CLOX_VAL_OBJECT: {
-            object_string* a_string = AS_STRING(a);
-            object_string* b_string = AS_STRING(b);
-            return a_string->length == b_string->length &&
-                   memcmp(a_string->chars, b_string->chars, a_string->length) == 0;
+            return AS_OBJECT(a) == AS_OBJECT(b);
         }
         default:
             return false;
