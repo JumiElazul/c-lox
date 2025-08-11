@@ -100,6 +100,8 @@ static token_type identifier_type(void) {
             return check_keyword(1, 2, "nd", TOKEN_AND);
         case 'c':
             return check_keyword(1, 4, "lass", TOKEN_CLASS);
+        case 'd':
+            return check_keyword(1, 4, "ebug", TOKEN_DEBUG);
         case 'e':
             return check_keyword(1, 3, "lse", TOKEN_ELSE);
         case 'f':

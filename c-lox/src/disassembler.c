@@ -81,6 +81,8 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
             return simple_instruction("OP_NEGATE", offset);
         case OP_RETURN:
             return simple_instruction("OP_RETURN", offset);
+        case OP_DEBUG:
+            return simple_instruction("OP_DEBUG", offset);
         default: {
             printf("Unknown opcode %d\n", instruction);
             return offset + 1;

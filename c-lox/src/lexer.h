@@ -45,7 +45,9 @@ typedef enum {
     TOKEN_VAR,
     TOKEN_WHILE,
     TOKEN_ERROR,
-    TOKEN_EOF
+    TOKEN_EOF,
+
+    TOKEN_DEBUG,
 } token_type;
 
 typedef struct {

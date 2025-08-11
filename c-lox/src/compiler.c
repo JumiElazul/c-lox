@@ -222,6 +222,8 @@ static void unary(void) {
     }
 }
 
+static void debug(void) { emit_byte(OP_DEBUG); }
+
 parse_rule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -263,6 +265,8 @@ parse_rule rules[] = {
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
+
+    [TOKEN_DEBUG] = {debug, NULL, PREC_NONE},
 };
 
 static void parse_precedence(precedence prec) {

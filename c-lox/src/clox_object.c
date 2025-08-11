@@ -69,3 +69,5 @@ void print_object(clox_value val) {
             break;
     }
 }
+
+void print_string(object_string* str) { printf("%s", str->chars); }

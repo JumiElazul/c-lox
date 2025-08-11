@@ -11,6 +11,27 @@
 
 virtual_machine vm;
 
+static void dump_interned_strings(void) {
+    printf("interned strings: [");
+    bool first = true;
+
+    for (int i = 0; i < vm.interned_strings.capacity; ++i) {
+        table_entry* entry = &vm.interned_strings.entries[i];
+        if (entry->key != NULL) {
+            if (!first) {
+                printf(", ");
+            }
+            printf("'");
+            print_string(entry->key);
+            printf("'");
+            first = false;
+        }
+    }
+    printf("]\n");
+}
+
+static void virtual_machine_debug(void) { dump_interned_strings(); }
+
 static void reset_stack(void) { vm.stack_top = vm.stack; }
 
 static void runtime_error(const char* format, ...) {
@@ -171,6 +192,10 @@ static interpret_result virtual_machine_run(void) {
                 printf("\n");
                 return INTERPRET_OK;
             }
+            case OP_DEBUG: {
+                virtual_machine_debug();
+                return INTERPRET_OK;
+            } break;
             default: {
                 printf("Unknown opcode %d\n", instruction);
                 return INTERPRET_RUNTIME_ERROR;

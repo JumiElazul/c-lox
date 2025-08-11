@@ -27,6 +27,7 @@ struct object_string {
 object_string* take_string(char* chars, int length);
 object_string* copy_string(const char* chars, int length);
 void print_object(clox_value val);
+void print_string(object_string* str);
 
 static inline bool is_object_type(clox_value val, object_type type) {
     return IS_OBJECT(val) && AS_OBJECT(val)->type == type;
