@@ -10,6 +10,19 @@
 #include "disassembler.h"
 #endif
 
+// declaration → classDecl
+//             | funcDecl
+//             | varDecl
+//             | statement ;
+
+// statement   → exprStmt
+//             | forStmt
+//             | ifStmt
+//             | printStmt
+//             | returnStmt
+//             | whileStmt
+//             | block ;
+
 typedef struct {
     token current;
     token previous;
@@ -45,6 +58,8 @@ bytecode_chunk* compiling_chunk;
 static bytecode_chunk* current_chunk(void) { return compiling_chunk; }
 
 static void parse_expression(void);
+static void statement(void);
+static void declaration_statement(void);
 
 static void error_at(token* t, const char* message) {
     if (parser.panic_mode) {
@@ -91,6 +106,16 @@ static void consume_if_matches(token_type type, const char* message) {
     }
 
     error_at_current(message);
+}
+
+static bool check_token(token_type type) { return parser.current.type == type; }
+
+static bool matches_token(token_type type) {
+    if (!check_token(type)) {
+        return false;
+    }
+    advance_parser();
+    return true;
 }
 
 static void emit_byte(uint8_t byte) {
@@ -222,7 +247,10 @@ static void unary(void) {
     }
 }
 
-static void debug(void) { emit_byte(OP_DEBUG); }
+static void debug_statement(void) {
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after debug statement.");
+    emit_byte(OP_DEBUG);
+}
 
 parse_rule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
@@ -266,7 +294,7 @@ parse_rule rules[] = {
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
 
-    [TOKEN_DEBUG] = {debug, NULL, PREC_NONE},
+    [TOKEN_DEBUG] = {NULL, NULL, PREC_NONE},
 };
 
 static void parse_precedence(precedence prec) {
@@ -287,9 +315,109 @@ static void parse_precedence(precedence prec) {
     }
 }
 
+static int make_constant(clox_value val) {
+    int constant = write_constant(current_chunk(), val, parser.previous.line);
+
+    if ((unsigned int)constant >= U24T_MAX) {
+        error("Too many constants in one chunk.");
+        return 0;
+    }
+
+    return constant;
+}
+
+static int identifier_constant(token* name) {
+    return make_constant(OBJECT_VALUE(copy_string(name->start, name->length)));
+}
+
+static int parse_variable(const char* err_msg) {
+    consume_if_matches(TOKEN_IDENTIFIER, err_msg);
+    return identifier_constant(&parser.previous);
+}
+
+static void define_variable(int global) { emit_bytes2(OP_DEFINE_GLOBAL, global); }
+
 static parse_rule* get_rule(token_type type) { return &rules[type]; }
 
 static void parse_expression(void) { parse_precedence(PREC_ASSIGNMENT); }
+
+static void print_statement(void) {
+    parse_expression();
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
+    emit_byte(OP_PRINT);
+}
+
+static void expression_statement(void) {
+    parse_expression();
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
+    emit_byte(OP_POP);
+}
+
+static void variable_declaration(void) {
+    uint8_t global = parse_variable("Expected variable name.");
+
+    if (matches_token(TOKEN_EQUAL)) {
+        parse_expression();
+    } else {
+        emit_byte(OP_NULL);
+    }
+
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after variable declaration");
+    define_variable(global);
+}
+
+static void synchronize(void) {
+    parser.panic_mode = false;
+
+    // When we are in panic mode, we want to continuously discard tokens until we hit a natural
+    // point to start again.  This means finding a semicolon, or the beginning of any declaration
+    // statements.
+    while (parser.current.type != TOKEN_EOF) {
+        if (parser.previous.type == TOKEN_SEMICOLON) {
+            return;
+        }
+
+        switch (parser.current.type) {
+            case TOKEN_CLASS:
+            case TOKEN_FUNC:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_PRINT:
+            case TOKEN_RETURN:
+                return;
+            default:;
+        }
+
+        advance_parser();
+    }
+}
+
+static void declaration_statement(void) {
+    if (matches_token(TOKEN_VAR)) {
+        variable_declaration();
+    } else {
+        statement();
+    }
+
+    if (parser.panic_mode) {
+        synchronize();
+    }
+}
+
+static void statement(void) {
+    if (matches_token(TOKEN_DEBUG)) {
+        debug_statement();
+        return;
+    }
+
+    if (matches_token(TOKEN_PRINT)) {
+        print_statement();
+    } else {
+        expression_statement();
+    }
+}
 
 bool compile(const char* source_code, bytecode_chunk* chunk) {
     init_lexer(source_code);
@@ -299,8 +427,11 @@ bool compile(const char* source_code, bytecode_chunk* chunk) {
     parser.panic_mode = false;
 
     advance_parser();
-    parse_expression();
-    consume_if_matches(TOKEN_EOF, "Expect end of expression.");
+
+    while (!matches_token(TOKEN_EOF)) {
+        declaration_statement();
+    }
+
     end_compilation();
     return !parser.had_error;
 }

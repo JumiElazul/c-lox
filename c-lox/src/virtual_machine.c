@@ -125,7 +125,6 @@ static interpret_result virtual_machine_run(void) {
             case OP_CONSTANT: {
                 clox_value constant = READ_CONSTANT();
                 virtual_machine_stack_push(constant);
-                printf("\n");
             } break;
             case OP_CONSTANT_LONG: {
                 u24_t u24_index;
@@ -134,7 +133,6 @@ static interpret_result virtual_machine_run(void) {
                 u24_index.lo = READ_BYTE();
                 int reconstructed_index = deconstruct_u24_t(u24_index);
                 virtual_machine_stack_push(vm.chunk->constants.values[reconstructed_index]);
-                printf("\n");
             } break;
             case OP_NULL: {
                 virtual_machine_stack_push(NULL_VALUE);
@@ -144,6 +142,9 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_FALSE: {
                 virtual_machine_stack_push(BOOL_VALUE(false));
+            } break;
+            case OP_POP: {
+                virtual_machine_stack_pop();
             } break;
             case OP_EQUAL: {
                 clox_value b = virtual_machine_stack_pop();
@@ -187,9 +188,11 @@ static interpret_result virtual_machine_run(void) {
                 }
                 virtual_machine_stack_push(NUMBER_VALUE(-AS_NUMBER(virtual_machine_stack_pop())));
             } break;
-            case OP_RETURN: {
+            case OP_PRINT: {
                 print_value(virtual_machine_stack_pop());
                 printf("\n");
+            } break;
+            case OP_RETURN: {
                 return INTERPRET_OK;
             }
             case OP_DEBUG: {

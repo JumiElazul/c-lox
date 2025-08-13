@@ -63,7 +63,7 @@ void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
     encode_line_run(chunk, line);
 }
 
-void write_constant(bytecode_chunk* chunk, clox_value val, int line) {
+int write_constant(bytecode_chunk* chunk, clox_value val, int line) {
     int constant_index = add_constant(chunk, val);
     if (constant_index <= 255) {
         write_to_bytecode_chunk(chunk, OP_CONSTANT, line);
@@ -75,6 +75,8 @@ void write_constant(bytecode_chunk* chunk, clox_value val, int line) {
         write_to_bytecode_chunk(chunk, fmt.mid, line);
         write_to_bytecode_chunk(chunk, fmt.lo, line);
     }
+
+    return constant_index;
 }
 
 int get_line(bytecode_chunk* chunk, int instr_index) {

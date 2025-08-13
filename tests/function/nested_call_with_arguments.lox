@@ -1,12 +1,12 @@
-fun returnArg(arg) {
+func returnArg(arg) {
   return arg;
 }
 
-fun returnFunCallWithArg(func, arg) {
+func returnFunCallWithArg(func, arg) {
   return returnArg(func)(arg);
 }
 
-fun printArg(arg) {
+func printArg(arg) {
   print arg;
 }
 

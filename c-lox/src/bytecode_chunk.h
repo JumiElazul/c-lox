@@ -10,6 +10,8 @@ typedef enum {
     OP_NULL,
     OP_TRUE,
     OP_FALSE,
+    OP_POP,
+    OP_DEFINE_GLOBAL,
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
@@ -19,6 +21,7 @@ typedef enum {
     OP_DIVIDE,
     OP_NOT,
     OP_NEGATE,
+    OP_PRINT,
     OP_RETURN,
 
     OP_DEBUG,
@@ -52,7 +55,7 @@ void free_bytecode_chunk(bytecode_chunk* chunk);
 u24_t construct_u24_t(int index);
 int deconstruct_u24_t(u24_t format);
 void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line);
-void write_constant(bytecode_chunk* chunk, clox_value val, int line);
+int write_constant(bytecode_chunk* chunk, clox_value val, int line);
 int get_line(bytecode_chunk* chunk, int index);
 
 #endif
