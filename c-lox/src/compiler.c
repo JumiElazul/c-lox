@@ -525,8 +525,8 @@ static void statement(void) {
 bool compile(const char* source_code, bytecode_chunk* chunk) {
     init_lexer(source_code);
     init_identifier_cache(&ident_cache);
-    compiler compiler;
-    init_compiler(&compiler);
+    compiler comp;
+    init_compiler(&comp);
     compiling_chunk = chunk;
 
     parser.had_error = false;
