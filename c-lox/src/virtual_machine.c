@@ -19,9 +19,11 @@ static void dump_global_variables(void) {
             if (!first) {
                 printf(", ");
             }
-            printf("'");
+            printf("{");
             print_string(entry->key);
-            printf("'");
+            printf(":");
+            print_value(entry->val);
+            printf("}");
             first = false;
         }
     }
@@ -209,7 +211,7 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_SET_GLOBAL: {
                 object_string* name = READ_STRING();
-                if (!hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
+                if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
@@ -222,7 +224,7 @@ static interpret_result virtual_machine_run(void) {
                 u24_index.lo = READ_BYTE();
                 int reconstructed_index = deconstruct_u24_t(u24_index);
                 object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
-                if (!hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
+                if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
