@@ -75,8 +75,12 @@ static void dump_interned_strings(void) {
 }
 
 static void virtual_machine_debug(void) {
+    printf("===== DEBUG =====\n");
+    dump_constant_table();
+    dump_stack();
     dump_global_variables();
     dump_interned_strings();
+    printf("===== END DEBUG =====\n");
 }
 
 static void reset_stack(void) { vm.stack_top = vm.stack; }

@@ -22,7 +22,7 @@
 //             | printStmt
 //             | returnStmt
 //             | whileStmt
-//             | block ;
+//             | blockStmt ;
 
 static identifier_cache ident_cache;
 
@@ -55,7 +55,19 @@ typedef struct {
     precedence prec;
 } parse_rule;
 
+typedef struct {
+    token name;
+    int depth;
+} local_variable;
+
+typedef struct {
+    local_variable locals[UINT8_COUNT];
+    int local_count;
+    int scope_depth;
+} compiler;
+
 token_parser parser;
+compiler* current_compiler = NULL;
 bytecode_chunk* compiling_chunk;
 
 static bytecode_chunk* current_chunk(void) { return compiling_chunk; }
@@ -163,6 +175,12 @@ static void emit_constant(clox_value val) {
     }
 }
 
+static void init_compiler(compiler* comp) {
+    comp->local_count = 0;
+    comp->scope_depth = 0;
+    current_compiler = comp;
+}
+
 static void end_compilation(void) {
     emit_return();
 #ifdef DEBUG_PRINT_CODE
@@ -171,6 +189,10 @@ static void end_compilation(void) {
     }
 #endif
 }
+
+static void begin_scope(void) { ++current_compiler->scope_depth; }
+
+static void end_scope(void) { --current_compiler->scope_depth; }
 
 static void parse_expression(void);
 static parse_rule* get_rule(token_type type);
@@ -416,6 +438,14 @@ static void print_statement(void) {
     emit_byte(OP_PRINT);
 }
 
+static void block_statement(void) {
+    while (!check_token(TOKEN_RIGHT_BRACE) && !check_token(TOKEN_EOF)) {
+        declaration_statement();
+    }
+
+    consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' to end block statement.");
+}
+
 static void expression_statement(void) {
     parse_expression();
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
@@ -483,6 +513,10 @@ static void statement(void) {
 
     if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_LEFT_BRACE)) {
+        begin_scope();
+        block_statement();
+        end_scope();
     } else {
         expression_statement();
     }
@@ -491,6 +525,8 @@ static void statement(void) {
 bool compile(const char* source_code, bytecode_chunk* chunk) {
     init_lexer(source_code);
     init_identifier_cache(&ident_cache);
+    compiler compiler;
+    init_compiler(&compiler);
     compiling_chunk = chunk;
 
     parser.had_error = false;
