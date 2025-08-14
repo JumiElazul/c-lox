@@ -148,6 +148,11 @@ static void emit_return(void) { emit_byte(OP_RETURN); }
 
 static void emit_constant(clox_value val) {
     int index = add_constant(current_chunk(), val);
+
+    if ((unsigned int)index >= U24T_MAX) {
+        error("Too many constants in one chunk.");
+    }
+
     bool long_instr = index > 255;
 
     if (!long_instr) {
