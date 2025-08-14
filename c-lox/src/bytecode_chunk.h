@@ -11,7 +11,10 @@ typedef enum {
     OP_TRUE,
     OP_FALSE,
     OP_POP,
+    OP_GET_GLOBAL,
+    OP_GET_GLOBAL_LONG,
     OP_DEFINE_GLOBAL,
+    OP_DEFINE_GLOBAL_LONG,
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
@@ -52,10 +55,10 @@ typedef struct {
 
 void init_bytecode_chunk(bytecode_chunk* chunk);
 void free_bytecode_chunk(bytecode_chunk* chunk);
+int add_constant(bytecode_chunk* chunk, clox_value val);
 u24_t construct_u24_t(int index);
 int deconstruct_u24_t(u24_t format);
 void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line);
-int write_constant(bytecode_chunk* chunk, clox_value val, int line);
 int get_line(bytecode_chunk* chunk, int index);
 
 #endif

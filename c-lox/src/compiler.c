@@ -60,6 +60,7 @@ static bytecode_chunk* current_chunk(void) { return compiling_chunk; }
 static void parse_expression(void);
 static void statement(void);
 static void declaration_statement(void);
+static int identifier_constant(token* name);
 
 static void error_at(token* t, const char* message) {
     if (parser.panic_mode) {
@@ -143,7 +144,14 @@ static void emit_bytes4(uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byt
 static void emit_return(void) { emit_byte(OP_RETURN); }
 
 static void emit_constant(clox_value val) {
-    write_constant(current_chunk(), val, parser.previous.line);
+    int index = add_constant(current_chunk(), val);
+
+    if (index <= 255) {
+        emit_bytes2(OP_CONSTANT, index);
+    } else {
+        u24_t i = construct_u24_t(index);
+        emit_bytes4(OP_CONSTANT_LONG, i.hi, i.mid, i.lo);
+    }
 }
 
 static void end_compilation(void) {
@@ -230,6 +238,18 @@ static void string(void) {
     emit_constant(OBJECT_VALUE(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
+static void named_variable(token name) {
+    int arg = identifier_constant(&name);
+    if (arg <= 255) {
+        emit_bytes2(OP_GET_GLOBAL, arg);
+    } else {
+        u24_t i = construct_u24_t(arg);
+        emit_bytes4(OP_GET_GLOBAL_LONG, i.hi, i.mid, i.lo);
+    }
+}
+
+static void variable(void) { named_variable(parser.previous); }
+
 static void unary(void) {
     token_type operator_type = parser.previous.type;
 
@@ -272,7 +292,7 @@ parse_rule rules[] = {
     [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_IDENTIFIER] = {NULL, NULL, PREC_NONE},
+    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, NULL, PREC_NONE},
@@ -316,7 +336,7 @@ static void parse_precedence(precedence prec) {
 }
 
 static int make_constant(clox_value val) {
-    int constant = write_constant(current_chunk(), val, parser.previous.line);
+    int constant = add_constant(current_chunk(), val);
 
     if ((unsigned int)constant >= U24T_MAX) {
         error("Too many constants in one chunk.");
@@ -335,7 +355,14 @@ static int parse_variable(const char* err_msg) {
     return identifier_constant(&parser.previous);
 }
 
-static void define_variable(int global) { emit_bytes2(OP_DEFINE_GLOBAL, global); }
+static void define_variable(int global) {
+    if (global <= 255) {
+        emit_bytes2(OP_DEFINE_GLOBAL, global);
+    } else {
+        u24_t i = construct_u24_t(global);
+        emit_bytes4(OP_DEFINE_GLOBAL_LONG, i.hi, i.mid, i.lo);
+    }
+}
 
 static parse_rule* get_rule(token_type type) { return &rules[type]; }
 

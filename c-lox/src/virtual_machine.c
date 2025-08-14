@@ -1,6 +1,4 @@
 #include "virtual_machine.h"
-#include "bytecode_chunk.h"
-#include "clox_object.h"
 #include "clox_value.h"
 #include "compiler.h"
 #include "disassembler.h"
@@ -10,6 +8,25 @@
 #include <string.h>
 
 virtual_machine vm;
+
+static void dump_global_variables(void) {
+    printf("global variables: [");
+    bool first = true;
+
+    for (int i = 0; i < vm.global_variables.capacity; ++i) {
+        table_entry* entry = &vm.global_variables.entries[i];
+        if (entry->key != NULL) {
+            if (!first) {
+                printf(", ");
+            }
+            printf("'");
+            print_string(entry->key);
+            printf("'");
+            first = false;
+        }
+    }
+    printf("]\n");
+}
 
 static void dump_interned_strings(void) {
     printf("interned strings: [");
@@ -30,7 +47,10 @@ static void dump_interned_strings(void) {
     printf("]\n");
 }
 
-static void virtual_machine_debug(void) { dump_interned_strings(); }
+static void virtual_machine_debug(void) {
+    dump_global_variables();
+    dump_interned_strings();
+}
 
 static void reset_stack(void) { vm.stack_top = vm.stack; }
 
@@ -69,10 +89,12 @@ static void concatenate_string(void) {
 void init_virtual_machine(void) {
     reset_stack();
     vm.objects = NULL;
+    init_hash_table(&vm.global_variables);
     init_hash_table(&vm.interned_strings);
 }
 
 void free_virtual_machine(void) {
+    free_hash_table(&vm.global_variables);
     free_hash_table(&vm.interned_strings);
     free_objects();
 }
@@ -91,6 +113,7 @@ clox_value virtual_machine_stack_pop(void) {
 static interpret_result virtual_machine_run(void) {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type, op)                                                                  \
     do {                                                                                           \
         if (!IS_NUMBER(virtual_machine_stack_peek(0)) ||                                           \
@@ -144,6 +167,44 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(BOOL_VALUE(false));
             } break;
             case OP_POP: {
+                virtual_machine_stack_pop();
+            } break;
+            case OP_GET_GLOBAL: {
+                object_string* name = READ_STRING();
+                clox_value val;
+                if (!hash_table_get(&vm.global_variables, name, &val)) {
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                virtual_machine_stack_push(val);
+            } break;
+            case OP_GET_GLOBAL_LONG: {
+                u24_t u24_index;
+                u24_index.hi = READ_BYTE();
+                u24_index.mid = READ_BYTE();
+                u24_index.lo = READ_BYTE();
+                int reconstructed_index = deconstruct_u24_t(u24_index);
+                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                clox_value val;
+                if (!hash_table_get(&vm.global_variables, name, &val)) {
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                virtual_machine_stack_push(val);
+            } break;
+            case OP_DEFINE_GLOBAL: {
+                object_string* name = READ_STRING();
+                hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
+                virtual_machine_stack_pop();
+            } break;
+            case OP_DEFINE_GLOBAL_LONG: {
+                u24_t u24_index;
+                u24_index.hi = READ_BYTE();
+                u24_index.mid = READ_BYTE();
+                u24_index.lo = READ_BYTE();
+                int reconstructed_index = deconstruct_u24_t(u24_index);
+                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 virtual_machine_stack_pop();
             } break;
             case OP_EQUAL: {
@@ -208,6 +269,7 @@ static interpret_result virtual_machine_run(void) {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRING
 #undef BINARY_OP
 }
 
