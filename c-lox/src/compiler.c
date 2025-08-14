@@ -2,6 +2,7 @@
 #include "bytecode_chunk.h"
 #include "clox_object.h"
 #include "common.h"
+#include "identifier_cache.h"
 #include "lexer.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,8 @@
 //             | returnStmt
 //             | whileStmt
 //             | block ;
+
+static identifier_cache ident_cache;
 
 typedef struct {
     token current;
@@ -366,7 +369,20 @@ static int make_constant(clox_value val) {
 }
 
 static int identifier_constant(token* name) {
-    return make_constant(OBJECT_VALUE(copy_string(name->start, name->length)));
+    object_string* str = copy_string(name->start, name->length);
+
+    // To prevent adding an identifier to the chunk's constant table every time we see it, we keep
+    // an 'identifier cache' hashmap of object_string* to index.  This way we can look up where it
+    // exists, if it does already.
+    int index;
+    if (identifier_cache_get(&ident_cache, str, &index)) {
+        return index;
+    }
+
+    index = make_constant(OBJECT_VALUE(str));
+    identifier_cache_set(&ident_cache, str, index);
+
+    return index;
 }
 
 static int parse_variable(const char* err_msg) {
@@ -469,6 +485,7 @@ static void statement(void) {
 
 bool compile(const char* source_code, bytecode_chunk* chunk) {
     init_lexer(source_code);
+    init_identifier_cache(&ident_cache);
     compiling_chunk = chunk;
 
     parser.had_error = false;
@@ -481,5 +498,6 @@ bool compile(const char* source_code, bytecode_chunk* chunk) {
     }
 
     end_compilation();
+    free_identifier_cache(&ident_cache);
     return !parser.had_error;
 }

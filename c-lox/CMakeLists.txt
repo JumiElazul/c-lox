@@ -8,6 +8,8 @@ set(CLOX_SOURCES
     "src/compiler.c"
     "src/disassembler.h"
     "src/disassembler.c"
+    "src/identifier_cache.h"
+    "src/identifier_cache.c"
     "src/hash_table.h"
     "src/hash_table.c"
     "src/lexer.h"
