@@ -9,6 +9,31 @@
 
 virtual_machine vm;
 
+static void dump_constant_table(void) {
+    printf("constant table: [");
+    bool first = true;
+
+    for (int i = 0; i < vm.chunk->constants.count; ++i) {
+        if (!first) {
+            printf(", ");
+        }
+
+        print_value(vm.chunk->constants.values[i]);
+        first = false;
+    }
+    printf("]\n");
+}
+
+static void dump_stack(void) {
+    printf("stack: ");
+    for (clox_value* slot = vm.stack; slot < vm.stack_top; ++slot) {
+        printf("[");
+        print_value(*slot);
+        printf("]");
+    }
+    printf("\n");
+}
+
 static void dump_global_variables(void) {
     printf("global variables: [");
     bool first = true;
@@ -138,17 +163,12 @@ static interpret_result virtual_machine_run(void) {
 
 #ifdef DEBUG_TRACE_EXECUTION
     printf("== virtual machine ==\n");
+    dump_constant_table();
 #endif
 
     while (true) {
 #ifdef DEBUG_TRACE_EXECUTION
-        printf("stack: ");
-        for (clox_value* slot = vm.stack; slot < vm.stack_top; ++slot) {
-            printf("[");
-            print_value(*slot);
-            printf("]");
-        }
-        printf("\n");
+        dump_stack();
         disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
 
