@@ -112,6 +112,14 @@ clox_value virtual_machine_stack_pop(void) {
     return *vm.stack_top;
 }
 
+static int READ_U24(void) {
+    u24_t u24_index;
+    u24_index.hi = *vm.ip++;
+    u24_index.mid = *vm.ip++;
+    u24_index.lo = *vm.ip++;
+    return deconstruct_u24_t(u24_index);
+}
+
 static interpret_result virtual_machine_run(void) {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
@@ -152,11 +160,7 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(constant);
             } break;
             case OP_CONSTANT_LONG: {
-                u24_t u24_index;
-                u24_index.hi = READ_BYTE();
-                u24_index.mid = READ_BYTE();
-                u24_index.lo = READ_BYTE();
-                int reconstructed_index = deconstruct_u24_t(u24_index);
+                int reconstructed_index = READ_U24();
                 virtual_machine_stack_push(vm.chunk->constants.values[reconstructed_index]);
             } break;
             case OP_NULL: {
@@ -181,11 +185,7 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(val);
             } break;
             case OP_GET_GLOBAL_LONG: {
-                u24_t u24_index;
-                u24_index.hi = READ_BYTE();
-                u24_index.mid = READ_BYTE();
-                u24_index.lo = READ_BYTE();
-                int reconstructed_index = deconstruct_u24_t(u24_index);
+                int reconstructed_index = READ_U24();
                 object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
                 clox_value val;
                 if (!hash_table_get(&vm.global_variables, name, &val)) {
@@ -200,11 +200,7 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_LONG: {
-                u24_t u24_index;
-                u24_index.hi = READ_BYTE();
-                u24_index.mid = READ_BYTE();
-                u24_index.lo = READ_BYTE();
-                int reconstructed_index = deconstruct_u24_t(u24_index);
+                int reconstructed_index = READ_U24();
                 object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 virtual_machine_stack_pop();
@@ -218,11 +214,7 @@ static interpret_result virtual_machine_run(void) {
                 }
             } break;
             case OP_SET_GLOBAL_LONG: {
-                u24_t u24_index;
-                u24_index.hi = READ_BYTE();
-                u24_index.mid = READ_BYTE();
-                u24_index.lo = READ_BYTE();
-                int reconstructed_index = deconstruct_u24_t(u24_index);
+                int reconstructed_index = READ_U24();
                 object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
                 if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
