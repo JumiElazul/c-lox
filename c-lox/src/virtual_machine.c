@@ -207,6 +207,27 @@ static interpret_result virtual_machine_run(void) {
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 virtual_machine_stack_pop();
             } break;
+            case OP_SET_GLOBAL: {
+                object_string* name = READ_STRING();
+                if (!hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
+                    hash_table_delete(&vm.global_variables, name);
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+            } break;
+            case OP_SET_GLOBAL_LONG: {
+                u24_t u24_index;
+                u24_index.hi = READ_BYTE();
+                u24_index.mid = READ_BYTE();
+                u24_index.lo = READ_BYTE();
+                int reconstructed_index = deconstruct_u24_t(u24_index);
+                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                if (!hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
+                    hash_table_delete(&vm.global_variables, name);
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+            } break;
             case OP_EQUAL: {
                 clox_value b = virtual_machine_stack_pop();
                 clox_value a = virtual_machine_stack_pop();

@@ -145,8 +145,9 @@ static void emit_return(void) { emit_byte(OP_RETURN); }
 
 static void emit_constant(clox_value val) {
     int index = add_constant(current_chunk(), val);
+    bool long_instr = index > 255;
 
-    if (index <= 255) {
+    if (!long_instr) {
         emit_bytes2(OP_CONSTANT, index);
     } else {
         u24_t i = construct_u24_t(index);
@@ -240,11 +241,24 @@ static void string(void) {
 
 static void named_variable(token name) {
     int arg = identifier_constant(&name);
-    if (arg <= 255) {
-        emit_bytes2(OP_GET_GLOBAL, arg);
+    bool long_instr = arg > 255;
+
+    if (matches_token(TOKEN_EQUAL)) {
+        parse_expression();
+
+        if (!long_instr) {
+            emit_bytes2(OP_SET_GLOBAL, arg);
+        } else {
+            u24_t i = construct_u24_t(arg);
+            emit_bytes4(OP_SET_GLOBAL_LONG, i.hi, i.mid, i.lo);
+        }
     } else {
-        u24_t i = construct_u24_t(arg);
-        emit_bytes4(OP_GET_GLOBAL_LONG, i.hi, i.mid, i.lo);
+        if (!long_instr) {
+            emit_bytes2(OP_GET_GLOBAL, arg);
+        } else {
+            u24_t i = construct_u24_t(arg);
+            emit_bytes4(OP_GET_GLOBAL_LONG, i.hi, i.mid, i.lo);
+        }
     }
 }
 
@@ -356,7 +370,9 @@ static int parse_variable(const char* err_msg) {
 }
 
 static void define_variable(int global) {
-    if (global <= 255) {
+    bool long_instr = global > 255;
+
+    if (!long_instr) {
         emit_bytes2(OP_DEFINE_GLOBAL, global);
     } else {
         u24_t i = construct_u24_t(global);
