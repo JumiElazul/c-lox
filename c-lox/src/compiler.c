@@ -59,6 +59,7 @@ typedef struct {
 typedef struct {
     token name;
     int depth;
+    bool is_const;
 } local_variable;
 
 typedef struct {
@@ -283,12 +284,20 @@ static void named_variable(token name, bool can_assign) {
     int local = resolve_local(current_compiler, &name);
 
     bool is_set = can_assign && matches_token(TOKEN_EQUAL);
-    if (is_set) {
-        parse_expression();
-    }
 
     // Local path
     if (local != -1) {
+        local_variable* lv = &current_compiler->locals[local];
+        bool is_const = lv->is_const;
+
+        if (is_set && is_const) {
+            error("Cannot change the value of a const variable.");
+        }
+
+        if (is_set) {
+            parse_expression();
+        }
+
         emit_bytes2(is_set ? OP_SET_LOCAL : OP_GET_LOCAL, (uint8_t)local);
         return;
     }
@@ -296,6 +305,10 @@ static void named_variable(token name, bool can_assign) {
     // Global path
     int global_index = identifier_constant(&name);
     bool long_instr = global_index > 255;
+
+    if (is_set) {
+        parse_expression();
+    }
 
     if (!long_instr) {
         emit_bytes2(is_set ? OP_SET_GLOBAL : OP_GET_GLOBAL, (uint8_t)global_index);
@@ -354,6 +367,7 @@ parse_rule rules[] = {
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
+    [TOKEN_CONST] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
@@ -447,7 +461,7 @@ static int resolve_local(compiler* comp, token* name) {
     return -1;
 }
 
-static void add_local(token name) {
+static void add_local(token name, bool is_const) {
     if (current_compiler->local_count == UINT8_COUNT) {
         error("Too many local variables in function.");
         return;
@@ -456,9 +470,10 @@ static void add_local(token name) {
     local_variable* local = &current_compiler->locals[current_compiler->local_count++];
     local->name = name;
     local->depth = -1;
+    local->is_const = is_const;
 }
 
-static void declare_variable(void) {
+static void declare_variable(bool is_const) {
     // If it's a global we don't do anything here.
     if (current_compiler->scope_depth == 0) {
         return;
@@ -478,15 +493,19 @@ static void declare_variable(void) {
         }
     }
 
-    add_local(*name);
+    add_local(*name, is_const);
 }
 
-static int parse_variable(const char* err_msg) {
-    consume_if_matches(TOKEN_IDENTIFIER, err_msg);
+static int parse_variable(bool is_const) {
+    if (is_const) {
+        consume_if_matches(TOKEN_VAR, "Expected 'var' keyword after const declaration.");
+    }
+
+    consume_if_matches(TOKEN_IDENTIFIER, "Expected variable name.");
 
     // If this is a global variable we will fall through to the function below, since globals are
     // late bound.  If it's a local, we need to declare it.
-    declare_variable();
+    declare_variable(is_const);
     if (current_compiler->scope_depth > 0) {
         return 0;
     }
@@ -541,12 +560,15 @@ static void expression_statement(void) {
     emit_byte(OP_POP);
 }
 
-static void variable_declaration(void) {
-    int var_index = parse_variable("Expected variable name.");
+static void variable_declaration(bool is_const) {
+    int var_index = parse_variable(is_const);
 
     if (matches_token(TOKEN_EQUAL)) {
         parse_expression();
     } else {
+        if (is_const) {
+            error("Const variables must be initialized.");
+        }
         emit_byte(OP_NULL);
     }
 
@@ -584,7 +606,9 @@ static void synchronize(void) {
 
 static void declaration_statement(void) {
     if (matches_token(TOKEN_VAR)) {
-        variable_declaration();
+        variable_declaration(false);
+    } else if (matches_token(TOKEN_CONST)) {
+        variable_declaration(true);
     } else {
         statement();
     }

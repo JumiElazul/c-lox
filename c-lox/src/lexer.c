@@ -98,8 +98,16 @@ static token_type identifier_type(void) {
     switch (lex.start[0]) {
         case 'a':
             return check_keyword(1, 2, "nd", TOKEN_AND);
-        case 'c':
-            return check_keyword(1, 4, "lass", TOKEN_CLASS);
+        case 'c': {
+            if (lex.current - lex.start > 1) {
+                switch (lex.start[1]) {
+                    case 'l':
+                        return check_keyword(2, 3, "ass", TOKEN_CLASS);
+                    case 'o':
+                        return check_keyword(2, 3, "nst", TOKEN_CONST);
+                }
+            }
+        } break;
         case 'd':
             return check_keyword(1, 4, "ebug", TOKEN_DEBUG);
         case 'e':
