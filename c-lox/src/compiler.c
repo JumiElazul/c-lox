@@ -412,12 +412,45 @@ static int identifier_constant(token* name) {
     return index;
 }
 
+static void add_local(token name) {
+    if (current_compiler->local_count == UINT8_COUNT) {
+        error("Too many local variables in function.");
+        return;
+    }
+
+    local_variable* local = &current_compiler->locals[current_compiler->local_count++];
+    local->name = name;
+    local->depth = current_compiler->scope_depth;
+}
+
+static void declare_variable(void) {
+    // If it's a global we don't do anything here.
+    if (current_compiler->scope_depth == 0) {
+        return;
+    }
+
+    token* name = &parser.previous;
+    add_local(*name);
+}
+
 static int parse_variable(const char* err_msg) {
     consume_if_matches(TOKEN_IDENTIFIER, err_msg);
+
+    // Handle local variables, by declaring them.  Globals skip this and fall through to below.
+    declare_variable();
+    if (current_compiler->scope_depth > 0) {
+        return 0;
+    }
+
     return identifier_constant(&parser.previous);
 }
 
 static void define_variable(int global) {
+    // No runtime code to actually create for local variables, so we leave.
+    if (current_compiler->scope_depth > 0) {
+        return;
+    }
+
     bool long_instr = global > 255;
 
     if (!long_instr) {
@@ -453,7 +486,7 @@ static void expression_statement(void) {
 }
 
 static void variable_declaration(void) {
-    int global = parse_variable("Expected variable name.");
+    int var_index = parse_variable("Expected variable name.");
 
     if (matches_token(TOKEN_EQUAL)) {
         parse_expression();
@@ -462,7 +495,7 @@ static void variable_declaration(void) {
     }
 
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after variable declaration");
-    define_variable(global);
+    define_variable(var_index);
 }
 
 static void synchronize(void) {
