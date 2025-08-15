@@ -6,6 +6,7 @@
 #include "lexer.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef DEBUG_PRINT_CODE
 #include "disassembler.h"
@@ -76,6 +77,7 @@ static void parse_expression(void);
 static void statement(void);
 static void declaration_statement(void);
 static int identifier_constant(token* name);
+static int resolve_local(compiler* comp, token* name);
 
 static void error_at(token* t, const char* message) {
     if (parser.panic_mode) {
@@ -192,7 +194,15 @@ static void end_compilation(void) {
 
 static void begin_scope(void) { ++current_compiler->scope_depth; }
 
-static void end_scope(void) { --current_compiler->scope_depth; }
+static void end_scope(void) {
+    --current_compiler->scope_depth;
+    compiler* comp = current_compiler;
+
+    while (comp->local_count > 0 && comp->locals[comp->local_count - 1].depth > comp->scope_depth) {
+        emit_byte(OP_POP);
+        --comp->local_count;
+    }
+}
 
 static void parse_expression(void);
 static parse_rule* get_rule(token_type type);
@@ -270,25 +280,28 @@ static void string(bool can_assign) {
 }
 
 static void named_variable(token name, bool can_assign) {
-    int arg = identifier_constant(&name);
-    bool long_instr = arg > 255;
+    int local = resolve_local(current_compiler, &name);
 
-    if (can_assign && matches_token(TOKEN_EQUAL)) {
+    bool is_set = can_assign && matches_token(TOKEN_EQUAL);
+    if (is_set) {
         parse_expression();
+    }
 
-        if (!long_instr) {
-            emit_bytes2(OP_SET_GLOBAL, arg);
-        } else {
-            u24_t i = construct_u24_t(arg);
-            emit_bytes4(OP_SET_GLOBAL_LONG, i.hi, i.mid, i.lo);
-        }
+    // Local path
+    if (local != -1) {
+        emit_bytes2(is_set ? OP_SET_LOCAL : OP_GET_LOCAL, (uint8_t)local);
+        return;
+    }
+
+    // Global path
+    int global_index = identifier_constant(&name);
+    bool long_instr = global_index > 255;
+
+    if (!long_instr) {
+        emit_bytes2(is_set ? OP_SET_GLOBAL : OP_GET_GLOBAL, (uint8_t)global_index);
     } else {
-        if (!long_instr) {
-            emit_bytes2(OP_GET_GLOBAL, arg);
-        } else {
-            u24_t i = construct_u24_t(arg);
-            emit_bytes4(OP_GET_GLOBAL_LONG, i.hi, i.mid, i.lo);
-        }
+        u24_t i = construct_u24_t(global_index);
+        emit_bytes4(is_set ? OP_SET_GLOBAL_LONG : OP_GET_GLOBAL_LONG, i.hi, i.mid, i.lo);
     }
 }
 
@@ -412,6 +425,28 @@ static int identifier_constant(token* name) {
     return index;
 }
 
+static bool identifiers_equal(token* a, token* b) {
+    if (a->length != b->length) {
+        return false;
+    }
+    return memcmp(a->start, b->start, a->length) == 0;
+}
+
+static int resolve_local(compiler* comp, token* name) {
+    for (int i = comp->local_count - 1; i >= 0; --i) {
+        local_variable* local = &comp->locals[i];
+        if (identifiers_equal(name, &local->name)) {
+            if (local->depth == -1) {
+                error("Can't read local variable in its own initializer.");
+            }
+
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 static void add_local(token name) {
     if (current_compiler->local_count == UINT8_COUNT) {
         error("Too many local variables in function.");
@@ -420,7 +455,7 @@ static void add_local(token name) {
 
     local_variable* local = &current_compiler->locals[current_compiler->local_count++];
     local->name = name;
-    local->depth = current_compiler->scope_depth;
+    local->depth = -1;
 }
 
 static void declare_variable(void) {
@@ -430,24 +465,45 @@ static void declare_variable(void) {
     }
 
     token* name = &parser.previous;
+
+    for (int i = current_compiler->local_count - 1; i >= 0; --i) {
+        local_variable* local = &current_compiler->locals[i];
+
+        if (local->depth != -1 && local->depth < current_compiler->scope_depth) {
+            break;
+        }
+
+        if (identifiers_equal(name, &local->name)) {
+            error("Already a variable with this name in this scope.");
+        }
+    }
+
     add_local(*name);
 }
 
 static int parse_variable(const char* err_msg) {
     consume_if_matches(TOKEN_IDENTIFIER, err_msg);
 
-    // Handle local variables, by declaring them.  Globals skip this and fall through to below.
+    // If this is a global variable we will fall through to the function below, since globals are
+    // late bound.  If it's a local, we need to declare it.
     declare_variable();
     if (current_compiler->scope_depth > 0) {
         return 0;
     }
 
+    // Add the global to the bytecode constant table.
     return identifier_constant(&parser.previous);
+}
+
+static void mark_initialized(void) {
+    current_compiler->locals[current_compiler->local_count - 1].depth =
+        current_compiler->scope_depth;
 }
 
 static void define_variable(int global) {
     // No runtime code to actually create for local variables, so we leave.
     if (current_compiler->scope_depth > 0) {
+        mark_initialized();
         return;
     }
 
