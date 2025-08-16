@@ -231,7 +231,6 @@ static interpret_result virtual_machine_run(void) {
             case OP_DEFINE_GLOBAL: {
                 object_string* name = READ_STRING();
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
-                hash_table_set(&vm.global_consts, name, BOOL_VALUE(false));
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_CONST: {
@@ -244,7 +243,6 @@ static interpret_result virtual_machine_run(void) {
                 int reconstructed_index = READ_U24();
                 object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
-                hash_table_set(&vm.global_consts, name, BOOL_VALUE(false));
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_LONG_CONST: {
@@ -256,10 +254,13 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_SET_GLOBAL: {
                 object_string* name = READ_STRING();
-                bool var_defined =
-                    hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
 
-                if (!var_defined) {
+                if (hash_table_get(&vm.global_consts, name, &(clox_value){0})) {
+                    runtime_error("Cannot reassign to a global variable marked 'const'.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;

@@ -291,7 +291,7 @@ static void named_variable(token name, bool can_assign) {
         bool is_const = lv->is_const;
 
         if (is_set && is_const) {
-            error("Cannot change the value of a const variable.");
+            error("Cannot reassign to a local variable marked 'const'.");
         }
 
         if (is_set) {
