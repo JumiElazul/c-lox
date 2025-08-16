@@ -121,11 +121,13 @@ void init_virtual_machine(void) {
     reset_stack();
     vm.objects = NULL;
     init_hash_table(&vm.global_variables);
+    init_hash_table(&vm.global_consts);
     init_hash_table(&vm.interned_strings);
 }
 
 void free_virtual_machine(void) {
     free_hash_table(&vm.global_variables);
+    free_hash_table(&vm.global_consts);
     free_hash_table(&vm.interned_strings);
     free_objects();
 }
@@ -229,17 +231,35 @@ static interpret_result virtual_machine_run(void) {
             case OP_DEFINE_GLOBAL: {
                 object_string* name = READ_STRING();
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
+                hash_table_set(&vm.global_consts, name, BOOL_VALUE(false));
+                virtual_machine_stack_pop();
+            } break;
+            case OP_DEFINE_GLOBAL_CONST: {
+                object_string* name = READ_STRING();
+                hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
+                hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_LONG: {
                 int reconstructed_index = READ_U24();
                 object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
+                hash_table_set(&vm.global_consts, name, BOOL_VALUE(false));
+                virtual_machine_stack_pop();
+            } break;
+            case OP_DEFINE_GLOBAL_LONG_CONST: {
+                int reconstructed_index = READ_U24();
+                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
+                hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
                 virtual_machine_stack_pop();
             } break;
             case OP_SET_GLOBAL: {
                 object_string* name = READ_STRING();
-                if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
+                bool var_defined =
+                    hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
+
+                if (!var_defined) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;

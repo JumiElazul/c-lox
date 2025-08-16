@@ -519,7 +519,7 @@ static void mark_initialized(void) {
         current_compiler->scope_depth;
 }
 
-static void define_variable(int global) {
+static void define_variable(int global, bool is_const) {
     // No runtime code to actually create for local variables, so we leave.
     if (current_compiler->scope_depth > 0) {
         mark_initialized();
@@ -529,10 +529,11 @@ static void define_variable(int global) {
     bool long_instr = global > 255;
 
     if (!long_instr) {
-        emit_bytes2(OP_DEFINE_GLOBAL, global);
+        emit_bytes2(is_const ? OP_DEFINE_GLOBAL_CONST : OP_DEFINE_GLOBAL, global);
     } else {
         u24_t i = construct_u24_t(global);
-        emit_bytes4(OP_DEFINE_GLOBAL_LONG, i.hi, i.mid, i.lo);
+        emit_bytes4(is_const ? OP_DEFINE_GLOBAL_LONG_CONST : OP_DEFINE_GLOBAL_LONG, i.hi, i.mid,
+                    i.lo);
     }
 }
 
@@ -573,7 +574,7 @@ static void variable_declaration(bool is_const) {
     }
 
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after variable declaration");
-    define_variable(var_index);
+    define_variable(var_index, is_const);
 }
 
 static void synchronize(void) {

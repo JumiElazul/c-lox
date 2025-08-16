@@ -28,7 +28,7 @@ static int constant_instruction(const char* name, bytecode_chunk* chunk, int off
     } else {
         constant = chunk->code[offset + 1];
     }
-    printf("%-16s %6d '", name, constant);
+    printf("%-24s %6d '", name, constant);
     print_value(chunk->constants.values[constant]);
     printf("'\n");
     return is_long_instr ? offset + 4 : offset + 2;
@@ -41,7 +41,7 @@ static int simple_instruction(const char* name, int offset) {
 
 static int byte_instruction(const char* name, bytecode_chunk* chunk, int offset) {
     uint8_t slot = chunk->code[offset + 1];
-    printf("%-16s %d\n", name, slot);
+    printf("%-24s %d\n", name, slot);
     return offset + 2;
 }
 
@@ -79,8 +79,12 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
             return constant_instruction("OP_GET_GLOBAL", chunk, offset, true);
         case OP_DEFINE_GLOBAL:
             return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset, false);
+        case OP_DEFINE_GLOBAL_CONST:
+            return constant_instruction("OP_DEFINE_GLOBAL_CONST", chunk, offset, false);
         case OP_DEFINE_GLOBAL_LONG:
-            return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset, true);
+            return constant_instruction("OP_DEFINE_GLOBAL_LONG", chunk, offset, true);
+        case OP_DEFINE_GLOBAL_LONG_CONST:
+            return constant_instruction("OP_DEFINE_GLOBAL_LONG_CONST", chunk, offset, true);
         case OP_SET_GLOBAL:
             return constant_instruction("OP_SET_GLOBAL", chunk, offset, false);
         case OP_SET_GLOBAL_LONG:
