@@ -79,6 +79,8 @@ static void statement(void);
 static void declaration_statement(void);
 static int identifier_constant(token* name);
 static int resolve_local(compiler* comp, token* name);
+static void and_(bool can_assign);
+static void or_(bool can_assign);
 
 static void error_at(token* t, const char* message) {
     if (parser.panic_mode) {
@@ -167,7 +169,19 @@ static void emit_bytes4(uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byt
     emit_byte(byte4);
 }
 
-// Writes the jump instrction and returns the index of the first 0xFF placeholder byte.
+static void emit_loop(int loop_start) {
+    emit_byte(OP_LOOP);
+
+    int offset = current_chunk()->count - loop_start + 2;
+    if (offset > UINT16_MAX) {
+        error("Loop body too large.");
+    }
+
+    emit_byte((offset >> 8) & 0xFF);
+    emit_byte(offset & 0xFF);
+}
+
+// Writes the jump instruction and returns the index of the first 0xFF placeholder byte.
 static int emit_jump(uint8_t instruction) {
     emit_bytes3(instruction, 0xFF, 0xFF);
     return current_chunk()->count - 2;
@@ -390,7 +404,7 @@ parse_rule rules[] = {
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
-    [TOKEN_AND] = {NULL, NULL, PREC_NONE},
+    [TOKEN_AND] = {NULL, and_, PREC_AND},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_CONST] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
@@ -399,7 +413,7 @@ parse_rule rules[] = {
     [TOKEN_FUNC] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_NULL] = {literal, NULL, PREC_NONE},
-    [TOKEN_OR] = {NULL, NULL, PREC_NONE},
+    [TOKEN_OR] = {NULL, or_, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
@@ -562,6 +576,41 @@ static void define_variable(int global, bool is_const) {
     }
 }
 
+// Left operand expression
+// OP_JUMP_IF_FALSE ---------v
+// OP_POP                    |
+// Right operand expression  |
+// OP_x continues   <---------
+static void and_(bool can_assign) {
+    // The left expression has already been compiled, and its value left on top of the stack.  If
+    // it's falsey, the entire 'and' must be false, so we skip the right operand and leave the left
+    // hand side value as the result of the entire expression.  Otherwise, we discard the left and
+    // leave the right as the result of the whole 'and' expression.
+    int end_jump = emit_jump(OP_JUMP_IF_FALSE);
+
+    emit_byte(OP_POP);
+    parse_precedence(PREC_AND);
+
+    patch_jump(end_jump);
+}
+
+// Left operand expression
+// OP_JUMP_IF_FALSE --v
+// OP_JUMP          --|------v
+// OP_POP           <--      |
+// Right operand expression  |
+// OP_x continues   <---------
+static void or_(bool can_assign) {
+    int else_jump = emit_jump(OP_JUMP_IF_FALSE);
+    int end_jump = emit_jump(OP_JUMP);
+
+    patch_jump(else_jump);
+    emit_byte(OP_POP);
+
+    parse_precedence(PREC_OR);
+    patch_jump(end_jump);
+}
+
 static parse_rule* get_rule(token_type type) { return &rules[type]; }
 
 static void parse_expression(void) { parse_precedence(PREC_ASSIGNMENT); }
@@ -570,6 +619,22 @@ static void print_statement(void) {
     parse_expression();
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
     emit_byte(OP_PRINT);
+}
+
+static void while_statement(void) {
+    int loop_start = current_chunk()->count;
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after while.");
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after while condition.");
+
+    int exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+
+    statement();
+    emit_loop(loop_start);
+
+    patch_jump(exit_jump);
+    emit_byte(OP_POP);
 }
 
 static void block_statement(void) {
@@ -682,6 +747,8 @@ static void statement(void) {
         print_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();
+    } else if (matches_token(TOKEN_WHILE)) {
+        while_statement();
     } else if (matches_token(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block_statement();
