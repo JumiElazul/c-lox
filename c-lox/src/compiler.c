@@ -555,6 +555,17 @@ static void print_statement(void) {
     emit_byte(OP_PRINT);
 }
 
+static void if_statement(void) {
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after 'if' statement.");
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after 'if' statement condition.");
+
+    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+    statement();
+
+    patch_jump(then_jump);
+}
+
 static void block_statement(void) {
     while (!check_token(TOKEN_RIGHT_BRACE) && !check_token(TOKEN_EOF)) {
         declaration_statement();
@@ -635,6 +646,8 @@ static void statement(void) {
 
     if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_IF)) {
+        if_statement();
     } else if (matches_token(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block_statement();
