@@ -24,9 +24,13 @@ set(CLOX_SOURCES
     "src/virtual_machine.c"
 )
 
-set(CLOX_EXE_NAME c-lox)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(libedit REQUIRED IMPORTED_TARGET libedit)
 
+set(CLOX_EXE_NAME c-lox)
 add_executable(${CLOX_EXE_NAME} ${CLOX_SOURCES})
+
+target_link_libraries(${CLOX_EXE_NAME} PRIVATE PkgConfig::libedit)
 
 target_compile_options(${CLOX_EXE_NAME} PRIVATE
     -Wall

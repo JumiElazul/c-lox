@@ -1,3 +1,5 @@
+#include "editline/history.h"
+#include "editline/readline.h"
 #include "virtual_machine.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,22 +13,18 @@ typedef enum {
 } err_code;
 
 static void run_repl(void) {
-    char line[1024];
-    while (true) {
-        printf("clox > ");
-
-        if (!fgets(line, sizeof(line), stdin)) {
-            printf("\n");
-            break;
-        }
-
-        line[strcspn(line, "\r\n")] = '\0';
+    char* line = NULL;
+    while ((line = readline("clox > ")) != NULL) {
+        add_history(line);
 
         if (strcmp(line, "q") == 0 || strcmp(line, "quit") == 0) {
+            free(line);
             break;
         }
 
         virtual_machine_interpret(line);
+
+        free(line);
     }
 }
 
