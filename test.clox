@@ -1,0 +1,14 @@
+const var a = "hello";
+const var b = " ";
+const var c = "hello";
+
+print a + b + c;
+
+{
+    var a = 1;
+    const var b = 2;
+    print "local:";
+    print a + b;
+}
+
+print "back in global";

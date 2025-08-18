@@ -108,6 +108,14 @@ static void error_at_current(const char* message) { error_at(&parser.current, me
 static void advance_parser(void) {
     parser.previous = parser.current;
 
+#ifdef DEBUG_TRACE_EXECUTION
+    static bool first = true;
+    if (!first) {
+        printf("%s\n", token_type_tostr(parser.previous.type));
+    }
+    first = false;
+#endif
+
     while (true) {
         parser.current = lexer_scan_token();
         if (parser.current.type != TOKEN_ERROR) {
