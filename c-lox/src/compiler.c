@@ -167,6 +167,12 @@ static void emit_bytes4(uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byt
     emit_byte(byte4);
 }
 
+// Writes the jump instrction and returns the index of the first 0xFF placeholder byte.
+static int emit_jump(uint8_t instruction) {
+    emit_bytes3(instruction, 0xFF, 0xFF);
+    return current_chunk()->count - 2;
+}
+
 static void emit_return(void) { emit_byte(OP_RETURN); }
 
 static void emit_constant(clox_value val) {
@@ -184,6 +190,17 @@ static void emit_constant(clox_value val) {
         u24_t i = construct_u24_t(index);
         emit_bytes4(OP_CONSTANT_LONG, i.hi, i.mid, i.lo);
     }
+}
+
+static void patch_jump(int offset) {
+    int jump = current_chunk()->count - offset - 2;
+
+    if (jump > UINT16_MAX) {
+        error("Too much code to jump over.");
+    }
+
+    current_chunk()->code[offset] = (jump >> 8) & 0xFF;
+    current_chunk()->code[offset + 1] = jump & 0xFF;
 }
 
 static void init_compiler(compiler* comp) {
@@ -555,17 +572,6 @@ static void print_statement(void) {
     emit_byte(OP_PRINT);
 }
 
-static void if_statement(void) {
-    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after 'if' statement.");
-    parse_expression();
-    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after 'if' statement condition.");
-
-    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
-    statement();
-
-    patch_jump(then_jump);
-}
-
 static void block_statement(void) {
     while (!check_token(TOKEN_RIGHT_BRACE) && !check_token(TOKEN_EOF)) {
         declaration_statement();
@@ -578,6 +584,34 @@ static void expression_statement(void) {
     parse_expression();
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
     emit_byte(OP_POP);
+}
+
+static void if_statement(void) {
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after 'if' statement.");
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after 'if' statement condition.");
+
+    // Save the index of the first placeholder byte to later backpatch.
+    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+    // Compile as much bytecode as needed to know how much bytecode to skip.
+    statement();
+
+    // To prevent fallthrough to the else condition, we also need to emit a non conditional jump
+    // here.
+    int else_jump = emit_jump(OP_JUMP);
+
+    // Backpatch in the amount of bytecode to skip if the condition evaluates to false.
+    patch_jump(then_jump);
+    emit_byte(OP_POP);
+
+    // If there's an else clause, we compile that statement too, to backpatch in the 'else_jump'
+    // bytes to skip.
+    if (matches_token(TOKEN_ELSE)) {
+        statement();
+    }
+
+    patch_jump(else_jump);
 }
 
 static void variable_declaration(bool is_const) {
