@@ -582,15 +582,17 @@ static void define_variable(int global, bool is_const) {
 // Right operand expression  |
 // OP_x continues   <---------
 static void and_(bool can_assign) {
-    // The left expression has already been compiled, and its value left on top of the stack.  If
-    // it's falsey, the entire 'and' must be false, so we skip the right operand and leave the left
-    // hand side value as the result of the entire expression.  Otherwise, we discard the left and
-    // leave the right as the result of the whole 'and' expression.
+    // The left hand side of the expression is already on the stack.
+    // Semantics: if A is falsey -> result is A; else -> result is B
+
+    // If that expression is false, jump over the rest of the expression to short circuit.
     int end_jump = emit_jump(OP_JUMP_IF_FALSE);
 
+    // Compile the expression
     emit_byte(OP_POP);
     parse_precedence(PREC_AND);
 
+    // Patch in how much to skip if the expression was false.
     patch_jump(end_jump);
 }
 
@@ -601,6 +603,11 @@ static void and_(bool can_assign) {
 // Right operand expression  |
 // OP_x continues   <---------
 static void or_(bool can_assign) {
+    // The left hand side of the expression is already on the stack.
+    // Semantics: if A is truthy -> result is A; else -> result is B
+
+    // If the lhs value is truthy, JUMP_IF_FALSE does nothing.  Then the JUMP instruction skips the
+    // rhs part.
     int else_jump = emit_jump(OP_JUMP_IF_FALSE);
     int end_jump = emit_jump(OP_JUMP);
 
