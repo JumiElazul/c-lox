@@ -23,7 +23,12 @@
 //             | printStmt
 //             | returnStmt
 //             | whileStmt
-//             | blockStmt ;
+//             | blockStmt
+//             | switchStmt ;
+
+// switchStmt  → "switch" "(" expression ")" "{" switchCase* defaultCase? "}" ;
+// switchCase  → "case" expression ":" statement* ;
+// defaultCase → "default" ":" statement* ;
 
 static identifier_cache ident_cache;
 
@@ -32,6 +37,7 @@ typedef struct {
     token previous;
     bool had_error;
     bool panic_mode;
+    bool first_token;
 } token_parser;
 
 typedef enum {
@@ -81,6 +87,7 @@ static int identifier_constant(token* name);
 static int resolve_local(compiler* comp, token* name);
 static void and_(bool can_assign);
 static void or_(bool can_assign);
+static void variable_declaration(bool is_const);
 
 static void error_at(token* t, const char* message) {
     if (parser.panic_mode) {
@@ -111,11 +118,10 @@ static void advance_parser(void) {
     parser.previous = parser.current;
 
 #ifdef DEBUG_TRACE_EXECUTION
-    static bool first = true;
-    if (!first) {
+    if (!parser.first_token) {
         printf("%s\n", token_type_tostr(parser.previous.type));
     }
-    first = false;
+    parser.first_token = false;
 #endif
 
     while (true) {
@@ -658,6 +664,62 @@ static void expression_statement(void) {
     emit_byte(OP_POP);
 }
 
+// A diagram of this is provided in images/for_statement.png.
+static void for_statement(void) {
+    begin_scope();
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after 'for'.");
+
+    // For loop initializer clause (optional)
+    if (matches_token(TOKEN_SEMICOLON)) {
+        // No initializer
+    } else if (matches_token(TOKEN_VAR)) {
+        variable_declaration(false);
+    } else if (matches_token(TOKEN_CONST)) {
+        variable_declaration(true);
+    } else {
+        expression_statement();
+    }
+
+    // For loop conditional expression. (optional)
+    int loop_start = current_chunk()->count;
+    int exit_jump = -1;
+    if (!matches_token(TOKEN_SEMICOLON)) {
+        parse_expression();
+        consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after for loop condition.");
+
+        // Jump out of the loop if the condition is false.
+        exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+        emit_byte(OP_POP);
+    }
+
+    // For loop post increment expression (optional)
+    if (!matches_token(TOKEN_RIGHT_PAREN)) {
+        // Skip the increment the first time, by jumping over it and running the body.
+        int body_jump = emit_jump(OP_JUMP);
+
+        // Save the increment start to patch in later.
+        int increment_start = current_chunk()->count;
+        parse_expression();
+        emit_byte(OP_POP);
+        consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after for clauses.");
+
+        emit_loop(loop_start);
+        loop_start = increment_start;
+        patch_jump(body_jump);
+    }
+
+    // Loop body
+    statement();
+    emit_loop(loop_start);
+
+    if (exit_jump != -1) {
+        patch_jump(exit_jump);
+        emit_byte(OP_POP);
+    }
+
+    end_scope();
+}
+
 static void if_statement(void) {
     consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after 'if' statement.");
     parse_expression();
@@ -752,6 +814,8 @@ static void statement(void) {
 
     if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_FOR)) {
+        for_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();
     } else if (matches_token(TOKEN_WHILE)) {
@@ -774,6 +838,7 @@ bool compile(const char* source_code, bytecode_chunk* chunk) {
 
     parser.had_error = false;
     parser.panic_mode = false;
+    parser.first_token = true;
 
     advance_parser();
 
@@ -783,5 +848,6 @@ bool compile(const char* source_code, bytecode_chunk* chunk) {
 
     end_compilation();
     free_identifier_cache(&ident_cache);
+
     return !parser.had_error;
 }

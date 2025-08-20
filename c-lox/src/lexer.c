@@ -101,6 +101,8 @@ static token_type identifier_type(void) {
         case 'c': {
             if (lex.current - lex.start > 1) {
                 switch (lex.start[1]) {
+                    case 'a':
+                        return check_keyword(2, 2, "se", TOKEN_CASE);
                     case 'l':
                         return check_keyword(2, 3, "ass", TOKEN_CLASS);
                     case 'o':
@@ -109,7 +111,17 @@ static token_type identifier_type(void) {
             }
         } break;
         case 'd':
-            return check_keyword(1, 4, "ebug", TOKEN_DEBUG);
+            if (lex.current - lex.start > 2) {
+                if (lex.start[1] == 'e') {
+                    switch (lex.start[2]) {
+                        case 'b':
+                            return check_keyword(3, 2, "ug", TOKEN_DEBUG);
+                        case 'f':
+                            return check_keyword(3, 4, "ault", TOKEN_DEFAULT);
+                    }
+                }
+            }
+            break;
         case 'e':
             return check_keyword(1, 3, "lse", TOKEN_ELSE);
         case 'f':
@@ -118,7 +130,7 @@ static token_type identifier_type(void) {
                     case 'a':
                         return check_keyword(2, 3, "lse", TOKEN_FALSE);
                     case 'o':
-                        return check_keyword(1, 1, "r", TOKEN_FOR);
+                        return check_keyword(2, 1, "r", TOKEN_FOR);
                     case 'u':
                         return check_keyword(2, 2, "nc", TOKEN_FUNC);
                 }
@@ -271,8 +283,12 @@ const char* token_type_tostr(token_type type) {
             return "TOKEN_LEFT_BRACE";
         case TOKEN_RIGHT_BRACE:
             return "TOKEN_RIGHT_BRACE";
+        case TOKEN_CASE:
+            return "TOKEN_CASE";
         case TOKEN_COMMA:
             return "TOKEN_COMMA";
+        case TOKEN_DEFAULT:
+            return "TOKEN_DEFAULT";
         case TOKEN_DOT:
             return "TOKEN_DOT";
         case TOKEN_MINUS:
@@ -333,6 +349,8 @@ const char* token_type_tostr(token_type type) {
             return "TOKEN_RETURN";
         case TOKEN_SUPER:
             return "TOKEN_SUPER";
+        case TOKEN_SWITCH:
+            return "TOKEN_SWITCH";
         case TOKEN_THIS:
             return "TOKEN_THIS";
         case TOKEN_TRUE:
