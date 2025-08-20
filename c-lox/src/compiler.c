@@ -658,6 +658,8 @@ static void block_statement(void) {
     consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' to end block statement.");
 }
 
+static void switch_statement(void) { printf("im a switch\n"); }
+
 static void expression_statement(void) {
     parse_expression();
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
@@ -824,6 +826,8 @@ static void statement(void) {
         begin_scope();
         block_statement();
         end_scope();
+    } else if (matches_token(TOKEN_SWITCH)) {
+        switch_statement();
     } else {
         expression_statement();
     }

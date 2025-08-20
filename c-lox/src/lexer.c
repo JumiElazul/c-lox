@@ -147,7 +147,15 @@ static token_type identifier_type(void) {
         case 'r':
             return check_keyword(1, 5, "eturn", TOKEN_RETURN);
         case 's':
-            return check_keyword(1, 4, "uper", TOKEN_SUPER);
+            if (lex.current - lex.start > 1) {
+                switch (lex.start[1]) {
+                    case 'u':
+                        return check_keyword(2, 3, "per", TOKEN_SUPER);
+                    case 'w':
+                        return check_keyword(2, 4, "itch", TOKEN_SWITCH);
+                }
+            }
+            break;
         case 't':
             if (lex.current - lex.start > 1) {
                 switch (lex.start[1]) {
