@@ -392,6 +392,7 @@ parse_rule rules[] = {
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_COLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, NULL, PREC_NONE},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
@@ -411,8 +412,10 @@ parse_rule rules[] = {
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, and_, PREC_AND},
+    [TOKEN_CASE] = {NULL, NULL, PREC_NONE},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
     [TOKEN_CONST] = {NULL, NULL, PREC_NONE},
+    [TOKEN_DEFAULT] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
@@ -423,6 +426,7 @@ parse_rule rules[] = {
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
+    [TOKEN_SWITCH] = {NULL, NULL, PREC_NONE},
     [TOKEN_THIS] = {NULL, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
@@ -658,7 +662,60 @@ static void block_statement(void) {
     consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' to end block statement.");
 }
 
-static void switch_statement(void) { printf("im a switch\n"); }
+static void switch_statement(void) {
+    begin_scope();
+
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after switch statement.");
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after switch expression.");
+
+    consume_if_matches(TOKEN_LEFT_BRACE, "Expected '{' to begin switch body.");
+
+    // We need an array of jump points, since we don't know which case will end up matching.  Each
+    // one of the possible cases, if matched, needs to jump past the 'default' case.  Since we don't
+    // know what this will be, we need to keep an array of them and patch all of them.
+    int end_jumps[UINT8_COUNT];
+    int end_jump_count = 0;
+
+    while (matches_token(TOKEN_CASE)) {
+        // Duplicate the expression at the bottom of the stack every time we find a case, since it
+        // will be eaten by the EQUAL opcode.
+        emit_byte(OP_DUP);
+        parse_expression();
+        emit_byte(OP_EQUAL);
+
+        // If false, we jump over the body of the case.  Otherwise we fall through.
+        int next_case = emit_jump(OP_JUMP_IF_FALSE);
+
+        emit_byte(OP_POP);
+        consume_if_matches(TOKEN_COLON, "Expected ':' after case expression.");
+        statement();
+
+        if (end_jump_count == UINT8_COUNT) {
+            error("Cannot have more than 255 cases in switch statement.");
+            return;
+        }
+
+        end_jumps[end_jump_count++] = emit_jump(OP_JUMP);
+
+        patch_jump(next_case);
+        emit_byte(OP_POP);
+    }
+
+    if (matches_token(TOKEN_DEFAULT)) {
+        consume_if_matches(TOKEN_COLON, "Expected ':' after default.");
+        statement();
+    }
+
+    for (int i = 0; i < end_jump_count; ++i) {
+        patch_jump(end_jumps[i]);
+    }
+
+    emit_byte(OP_POP);
+    consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' to end switch body.");
+
+    end_scope();
+}
 
 static void expression_statement(void) {
     parse_expression();

@@ -202,6 +202,9 @@ static interpret_result virtual_machine_run(void) {
             case OP_POP: {
                 virtual_machine_stack_pop();
             } break;
+            case OP_DUP: {
+                virtual_machine_stack_push(virtual_machine_stack_peek(0));
+            } break;
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
                 virtual_machine_stack_push(vm.stack[slot]);

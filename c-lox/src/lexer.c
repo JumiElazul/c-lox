@@ -98,6 +98,8 @@ static token_type identifier_type(void) {
     switch (lex.start[0]) {
         case 'a':
             return check_keyword(1, 2, "nd", TOKEN_AND);
+        case 'b':
+            return check_keyword(1, 4, "reak", TOKEN_BREAK);
         case 'c': {
             if (lex.current - lex.start > 1) {
                 switch (lex.start[1]) {
@@ -106,7 +108,14 @@ static token_type identifier_type(void) {
                     case 'l':
                         return check_keyword(2, 3, "ass", TOKEN_CLASS);
                     case 'o':
-                        return check_keyword(2, 3, "nst", TOKEN_CONST);
+                        if (lex.current - lex.start > 3) {
+                            switch (lex.start[3]) {
+                                case 's':
+                                    return check_keyword(4, 1, "t", TOKEN_CONST);
+                                case 't':
+                                    return check_keyword(4, 4, "inue", TOKEN_CONTINUE);
+                            }
+                        }
                 }
             }
         } break;
@@ -254,6 +263,8 @@ token lexer_scan_token(void) {
             return make_token(TOKEN_RIGHT_BRACE);
         case ';':
             return make_token(TOKEN_SEMICOLON);
+        case ':':
+            return make_token(TOKEN_COLON);
         case ',':
             return make_token(TOKEN_COMMA);
         case '.':
@@ -293,6 +304,8 @@ const char* token_type_tostr(token_type type) {
             return "TOKEN_RIGHT_BRACE";
         case TOKEN_CASE:
             return "TOKEN_CASE";
+        case TOKEN_COLON:
+            return "TOKEN_COLON";
         case TOKEN_COMMA:
             return "TOKEN_COMMA";
         case TOKEN_DEFAULT:
@@ -333,10 +346,14 @@ const char* token_type_tostr(token_type type) {
             return "TOKEN_NUMBER";
         case TOKEN_AND:
             return "TOKEN_AND";
+        case TOKEN_BREAK:
+            return "TOKEN_BREAK";
         case TOKEN_CLASS:
             return "TOKEN_CLASS";
         case TOKEN_CONST:
             return "TOKEN_CONST";
+        case TOKEN_CONTINUE:
+            return "TOKEN_CONTINUE";
         case TOKEN_ELSE:
             return "TOKEN_ELSE";
         case TOKEN_FALSE:
