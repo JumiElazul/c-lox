@@ -1,4 +1,3 @@
-#include "editline/history.h"
 #include "editline/readline.h"
 #include "virtual_machine.h"
 #include <stdio.h>
