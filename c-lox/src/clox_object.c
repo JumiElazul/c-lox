@@ -35,6 +35,14 @@ static uint32_t hash_string(const char* key, int length) {
     return hash;
 }
 
+object_function* new_function(void) {
+    object_function* function = ALLOCATE_OBJECT(object_function, OBJECT_FUNCTION);
+    function->arity = 0;
+    function->name = NULL;
+    init_bytecode_chunk(&function->chunk);
+    return function;
+}
+
 object_string* take_string(char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
 
@@ -62,8 +70,13 @@ object_string* copy_string(const char* chars, int length) {
     return allocate_string(heap_chars, length, hash);
 }
 
+static void print_function(object_function* function) { printf("<fn %s>", function->name->chars); }
+
 void print_object(clox_value val) {
     switch (OBJECT_TYPE(val)) {
+        case OBJECT_FUNCTION:
+            print_function(AS_FUNCTION(val));
+            break;
         case OBJECT_STRING:
             printf("%s", AS_CSTRING(val));
             break;
