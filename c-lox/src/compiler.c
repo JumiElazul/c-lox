@@ -663,8 +663,6 @@ static void block_statement(void) {
 }
 
 static void switch_statement(void) {
-    begin_scope();
-
     consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after switch statement.");
     parse_expression();
     consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after switch expression.");
@@ -713,8 +711,6 @@ static void switch_statement(void) {
 
     emit_byte(OP_POP);
     consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' to end switch body.");
-
-    end_scope();
 }
 
 static void expression_statement(void) {

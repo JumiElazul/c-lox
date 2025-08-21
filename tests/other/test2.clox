@@ -6,8 +6,10 @@ switch (a) {
         print 1;
     case 2:
         print 2;
-    case 3:
-        print 3;
+    case 3: {
+        var c = 3;
+        print c;
+    }
     default:
         print "default case";
 }
