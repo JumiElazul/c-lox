@@ -111,7 +111,15 @@ typedef struct {
     bool is_const;
 } local_variable;
 
+typedef enum {
+    TYPE_FUNCTION,
+    TYPE_SCRIPT,
+} function_type;
+
 typedef struct {
+    object_function* function;
+    function_type type;
+
     local_variable locals[UINT8_COUNT];
     int local_count;
     int scope_depth;
@@ -121,7 +129,7 @@ token_parser parser;
 compiler* current_compiler = NULL;
 bytecode_chunk* compiling_chunk;
 
-static bytecode_chunk* current_chunk(void) { return compiling_chunk; }
+static bytecode_chunk* current_chunk(void) { return &current_compiler->function->chunk; }
 
 static void parse_expression(void);
 static void statement(void);
@@ -266,19 +274,32 @@ static void patch_jump(int offset) {
     current_chunk()->code[offset + 1] = jump & 0xFF;
 }
 
-static void init_compiler(compiler* comp) {
+static void init_compiler(compiler* comp, function_type type) {
+    comp->function = NULL;
+    comp->type = type;
     comp->local_count = 0;
     comp->scope_depth = 0;
+    comp->function = new_function();
     current_compiler = comp;
+
+    // The compiler claims slot 0 in the locals array for its own internal use.
+    local_variable* local = &current_compiler->locals[current_compiler->local_count++];
+    local->depth = 0;
+    local->name.start = "";
+    local->name.length = 0;
 }
 
-static void end_compilation(void) {
+static object_function* end_compilation(void) {
     emit_return();
+    object_function* function = current_compiler->function;
 #ifdef DEBUG_PRINT_CODE
     if (!parser.had_error) {
-        disassemble_chunk(current_chunk(), "code");
+        disassemble_chunk(current_chunk(),
+                          function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
+
+    return function;
 }
 
 static void begin_scope(void) { ++current_compiler->scope_depth; }
@@ -929,11 +950,11 @@ static void statement(void) {
     }
 }
 
-bool compile(const char* source_code, bytecode_chunk* chunk) {
+object_function* compile(const char* source_code, bytecode_chunk* chunk) {
     init_lexer(source_code);
     init_identifier_cache(&ident_cache);
     compiler comp;
-    init_compiler(&comp);
+    init_compiler(&comp, TYPE_SCRIPT);
     compiling_chunk = chunk;
 
     parser.had_error = false;
@@ -946,8 +967,8 @@ bool compile(const char* source_code, bytecode_chunk* chunk) {
         declaration_statement();
     }
 
-    end_compilation();
+    object_function* function = end_compilation();
     free_identifier_cache(&ident_cache);
 
-    return !parser.had_error;
+    return parser.had_error ? NULL : function;
 }

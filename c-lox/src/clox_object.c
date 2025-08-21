@@ -70,7 +70,13 @@ object_string* copy_string(const char* chars, int length) {
     return allocate_string(heap_chars, length, hash);
 }
 
-static void print_function(object_function* function) { printf("<fn %s>", function->name->chars); }
+static void print_function(object_function* function) {
+    if (function->name == NULL) {
+        printf("<script>");
+        return;
+    }
+    printf("<fn %s>", function->name->chars);
+}
 
 void print_object(clox_value val) {
     switch (OBJECT_TYPE(val)) {
