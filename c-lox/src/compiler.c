@@ -950,12 +950,11 @@ static void statement(void) {
     }
 }
 
-object_function* compile(const char* source_code, bytecode_chunk* chunk) {
+object_function* compile(const char* source_code) {
     init_lexer(source_code);
     init_identifier_cache(&ident_cache);
     compiler comp;
     init_compiler(&comp, TYPE_SCRIPT);
-    compiling_chunk = chunk;
 
     parser.had_error = false;
     parser.panic_mode = false;

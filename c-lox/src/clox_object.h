@@ -37,6 +37,7 @@ struct object_string {
 object_function* new_function(void);
 object_string* take_string(char* chars, int length);
 object_string* copy_string(const char* chars, int length);
+void print_function(object_function* val);
 void print_object(clox_value val);
 void print_string(object_string* str);
 

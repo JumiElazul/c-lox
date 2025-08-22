@@ -58,9 +58,7 @@ void print_value(clox_value val) {
             printf("%g", AS_NUMBER(val));
         } break;
         case CLOX_VAL_OBJECT: {
-            if (IS_STRING(val)) {
-                printf("%s", AS_CSTRING(val));
-            }
+            print_object(val);
         } break;
     }
 }

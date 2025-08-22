@@ -9,16 +9,16 @@
 
 virtual_machine vm;
 
-static void dump_constant_table(void) {
+static void dump_constant_table(call_frame* frame) {
     printf("constant table: [");
     bool first = true;
 
-    for (int i = 0; i < vm.chunk->constants.count; ++i) {
+    for (int i = 0; i < frame->function->chunk.constants.count; ++i) {
         if (!first) {
             printf(", ");
         }
 
-        print_value(vm.chunk->constants.values[i]);
+        print_value(frame->function->chunk.constants.values[i]);
         first = false;
     }
     printf("]\n");
@@ -74,16 +74,19 @@ static void dump_interned_strings(void) {
     printf("]\n");
 }
 
-static void virtual_machine_debug(void) {
+static void virtual_machine_debug(call_frame* frame) {
     printf("===== DEBUG =====\n");
-    dump_constant_table();
+    dump_constant_table(frame);
     dump_stack();
     dump_global_variables();
     dump_interned_strings();
     printf("===== END DEBUG =====\n");
 }
 
-static void reset_stack(void) { vm.stack_top = vm.stack; }
+static void reset_stack(void) {
+    vm.stack_top = vm.stack;
+    vm.frame_count = 0;
+}
 
 static void runtime_error(const char* format, ...) {
     va_list args;
@@ -91,8 +94,11 @@ static void runtime_error(const char* format, ...) {
     vfprintf(stderr, format, args);
     va_end(args);
     fputs("\n", stderr);
-    size_t instruction = vm.ip - vm.chunk->code - 1;
-    int line = get_line(vm.chunk, instruction);
+
+    call_frame* frame = &vm.frames[vm.frame_count - 1];
+    size_t instruction = frame->ip - frame->function->chunk.code - 1;
+    int line = get_line(&frame->function->chunk, instruction);
+
     fprintf(stderr, "[line %d] in script\n", line);
     reset_stack();
 }
@@ -143,18 +149,20 @@ clox_value virtual_machine_stack_pop(void) {
     return *vm.stack_top;
 }
 
-static int READ_U24(void) {
+static int READ_U24(call_frame* frame) {
     u24_t u24_index;
-    u24_index.hi = *vm.ip++;
-    u24_index.mid = *vm.ip++;
-    u24_index.lo = *vm.ip++;
+    u24_index.hi = *frame->ip++;
+    u24_index.mid = *frame->ip++;
+    u24_index.lo = *frame->ip++;
     return deconstruct_u24_t(u24_index);
 }
 
 static interpret_result virtual_machine_run(void) {
-#define READ_BYTE() (*vm.ip++)
-#define READ_SHORT() (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+    call_frame* frame = &vm.frames[vm.frame_count - 1];
+
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type, op)                                                                  \
     do {                                                                                           \
@@ -170,13 +178,14 @@ static interpret_result virtual_machine_run(void) {
 
 #ifdef DEBUG_TRACE_EXECUTION
     printf("== virtual machine ==\n");
-    dump_constant_table();
+    dump_constant_table(frame);
 #endif
 
     while (true) {
 #ifdef DEBUG_TRACE_EXECUTION
         dump_stack();
-        disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+        disassemble_instruction(&frame->function->chunk,
+                                (int)(frame->ip - frame->function->chunk.code));
 #endif
 
         uint8_t instruction;
@@ -187,8 +196,9 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(constant);
             } break;
             case OP_CONSTANT_LONG: {
-                int reconstructed_index = READ_U24();
-                virtual_machine_stack_push(vm.chunk->constants.values[reconstructed_index]);
+                int reconstructed_index = READ_U24(frame);
+                virtual_machine_stack_push(
+                    frame->function->chunk.constants.values[reconstructed_index]);
             } break;
             case OP_NULL: {
                 virtual_machine_stack_push(NULL_VALUE);
@@ -207,11 +217,11 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                virtual_machine_stack_push(vm.stack[slot]);
+                virtual_machine_stack_push(frame->slots[slot]);
             } break;
             case OP_SET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                vm.stack[slot] = virtual_machine_stack_peek(0);
+                frame->slots[slot] = virtual_machine_stack_peek(0);
             } break;
             case OP_GET_GLOBAL: {
                 object_string* name = READ_STRING();
@@ -223,8 +233,9 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(val);
             } break;
             case OP_GET_GLOBAL_LONG: {
-                int reconstructed_index = READ_U24();
-                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                int reconstructed_index = READ_U24(frame);
+                object_string* name =
+                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
                 clox_value val;
                 if (!hash_table_get(&vm.global_variables, name, &val)) {
                     runtime_error("Undefined variable '%s'.", name->chars);
@@ -244,14 +255,16 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_LONG: {
-                int reconstructed_index = READ_U24();
-                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                int reconstructed_index = READ_U24(frame);
+                object_string* name =
+                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_LONG_CONST: {
-                int reconstructed_index = READ_U24();
-                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                int reconstructed_index = READ_U24(frame);
+                object_string* name =
+                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
                 virtual_machine_stack_pop();
@@ -271,8 +284,9 @@ static interpret_result virtual_machine_run(void) {
                 }
             } break;
             case OP_SET_GLOBAL_LONG: {
-                int reconstructed_index = READ_U24();
-                object_string* name = AS_STRING(vm.chunk->constants.values[reconstructed_index]);
+                int reconstructed_index = READ_U24(frame);
+                object_string* name =
+                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
                 if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);
@@ -327,23 +341,23 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_JUMP: {
                 uint16_t offset = READ_SHORT();
-                vm.ip += offset;
+                frame->ip += offset;
             } break;
             case OP_JUMP_IF_FALSE: {
                 uint16_t offset = READ_SHORT();
                 if (is_falsey(virtual_machine_stack_peek(0))) {
-                    vm.ip += offset;
+                    frame->ip += offset;
                 }
             } break;
             case OP_LOOP: {
                 uint16_t offset = READ_SHORT();
-                vm.ip -= offset;
+                frame->ip -= offset;
             } break;
             case OP_RETURN: {
                 return INTERPRET_OK;
             }
             case OP_DEBUG: {
-                virtual_machine_debug();
+                virtual_machine_debug(frame);
                 return INTERPRET_OK;
             } break;
             default: {
@@ -361,19 +375,18 @@ static interpret_result virtual_machine_run(void) {
 }
 
 interpret_result virtual_machine_interpret(const char* source_code) {
-    bytecode_chunk chunk;
-    init_bytecode_chunk(&chunk);
-
-    if (!compile(source_code, &chunk)) {
-        free_bytecode_chunk(&chunk);
+    object_function* function = compile(source_code);
+    if (function == NULL) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    vm.chunk = &chunk;
-    vm.ip = vm.chunk->code;
+    virtual_machine_stack_push(OBJECT_VALUE(function));
+    call_frame* frame = &vm.frames[vm.frame_count++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    frame->slots = vm.stack;
 
     interpret_result result = virtual_machine_run();
-    free_bytecode_chunk(&chunk);
-
+    virtual_machine_stack_pop(); // Pop the function that is implicity held at stack slot 1 here.
     return result;
 }

@@ -3,6 +3,6 @@
 #include "bytecode_chunk.h"
 #include "clox_object.h"
 
-object_function* compile(const char* source_code, bytecode_chunk* chunk);
+object_function* compile(const char* source_code);
 
 #endif

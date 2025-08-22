@@ -5,10 +5,18 @@
 #include "hash_table.h"
 
 #define STACK_MAX 256
+#define FRAMES_MAX 64
 
 typedef struct {
-    bytecode_chunk* chunk;
+    object_function* function;
     uint8_t* ip;
+    clox_value* slots;
+} call_frame;
+
+typedef struct {
+    call_frame frames[FRAMES_MAX];
+    int frame_count;
+
     clox_value stack[STACK_MAX];
     clox_value* stack_top;
     hash_table global_variables;
