@@ -387,6 +387,11 @@ interpret_result virtual_machine_interpret(const char* source_code) {
     frame->slots = vm.stack;
 
     interpret_result result = virtual_machine_run();
-    virtual_machine_stack_pop(); // Pop the function that is implicity held at stack slot 1 here.
+
+    if (result == INTERPRET_OK && vm.stack_top > vm.stack) {
+        // Pop the function that is implicity held at stack slot 1 here.
+        virtual_machine_stack_pop();
+    }
+
     return result;
 }
