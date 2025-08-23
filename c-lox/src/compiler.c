@@ -116,7 +116,8 @@ typedef enum {
     TYPE_SCRIPT,
 } function_type;
 
-typedef struct {
+typedef struct compiler {
+    struct compiler* enclosing_compiler;
     object_function* function;
     function_type type;
 
@@ -139,6 +140,7 @@ static int resolve_local(compiler* comp, token* name);
 static void and_(bool can_assign);
 static void or_(bool can_assign);
 static void variable_declaration(bool is_const);
+static uint8_t argument_list(void);
 
 static void error_at(token* t, const char* message) {
     if (parser.panic_mode) {
@@ -244,7 +246,10 @@ static int emit_jump(uint8_t instruction) {
     return current_chunk()->count - 2;
 }
 
-static void emit_return(void) { emit_byte(OP_RETURN); }
+static void emit_return(void) {
+    emit_byte(OP_NULL);
+    emit_byte(OP_RETURN);
+}
 
 static void emit_constant(clox_value val) {
     int index = add_constant(current_chunk(), val);
@@ -275,12 +280,18 @@ static void patch_jump(int offset) {
 }
 
 static void init_compiler(compiler* comp, function_type type) {
+    comp->enclosing_compiler = current_compiler;
     comp->function = NULL;
     comp->type = type;
     comp->local_count = 0;
     comp->scope_depth = 0;
     comp->function = new_function();
     current_compiler = comp;
+
+    if (type != TYPE_SCRIPT) {
+        current_compiler->function->name =
+            copy_string(parser.previous.start, parser.previous.length);
+    }
 
     // The compiler claims slot 0 in the locals array for its own internal use.
     local_variable* local = &current_compiler->locals[current_compiler->local_count++];
@@ -299,6 +310,7 @@ static object_function* end_compilation(void) {
     }
 #endif
 
+    current_compiler = current_compiler->enclosing_compiler;
     return function;
 }
 
@@ -357,6 +369,11 @@ static void binary(bool can_assign) {
         default:
             return;
     }
+}
+
+static void call(bool can_assign) {
+    uint8_t arg_count = argument_list();
+    emit_bytes2(OP_CALL, arg_count);
 }
 
 static void literal(bool can_assign) {
@@ -452,7 +469,7 @@ static void debug_statement(void) {
 }
 
 parse_rule rules[] = {
-    [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
+    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
@@ -609,12 +626,12 @@ static void declare_variable(bool is_const) {
     add_local(*name, is_const);
 }
 
-static int parse_variable(bool is_const) {
+static int parse_variable(const char* identifier_msg, bool is_const) {
     if (is_const) {
         consume_if_matches(TOKEN_VAR, "Expected 'var' keyword after const declaration.");
     }
 
-    consume_if_matches(TOKEN_IDENTIFIER, "Expected variable name.");
+    consume_if_matches(TOKEN_IDENTIFIER, identifier_msg);
 
     // If this is a global variable we will fall through to the function below, since globals are
     // late bound.  If it's a local, we need to declare it.
@@ -628,6 +645,10 @@ static int parse_variable(bool is_const) {
 }
 
 static void mark_initialized(void) {
+    if (current_compiler->scope_depth == 0) {
+        return;
+    }
+
     current_compiler->locals[current_compiler->local_count - 1].depth =
         current_compiler->scope_depth;
 }
@@ -648,6 +669,22 @@ static void define_variable(int global, bool is_const) {
         emit_bytes4(is_const ? OP_DEFINE_GLOBAL_LONG_CONST : OP_DEFINE_GLOBAL_LONG, i.hi, i.mid,
                     i.lo);
     }
+}
+
+static uint8_t argument_list(void) {
+    uint8_t arg_count = 0;
+    if (!check_token(TOKEN_RIGHT_PAREN)) {
+        do {
+            if (arg_count == 255) {
+                error("Function cannot have more than 255 arguments.");
+            }
+
+            parse_expression();
+            ++arg_count;
+        } while (matches_token(TOKEN_COMMA));
+    }
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after function arguments.");
+    return arg_count;
 }
 
 // Left operand expression
@@ -702,6 +739,20 @@ static void print_statement(void) {
     emit_byte(OP_PRINT);
 }
 
+static void return_statement(void) {
+    if (current_compiler->type == TYPE_SCRIPT) {
+        error("Can't return from top-level code.");
+    }
+
+    if (matches_token(TOKEN_SEMICOLON)) {
+        emit_return();
+    } else {
+        parse_expression();
+        consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after return value.");
+        emit_byte(OP_RETURN);
+    }
+}
+
 static void while_statement(void) {
     int loop_start = current_chunk()->count;
     consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after while.");
@@ -724,6 +775,40 @@ static void block_statement(void) {
     }
 
     consume_if_matches(TOKEN_RIGHT_BRACE, "Expected '}' to end block statement.");
+}
+
+static void compile_function(function_type type) {
+    compiler comp;
+    init_compiler(&comp, TYPE_FUNCTION);
+    begin_scope();
+
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
+
+    if (!check_token(TOKEN_RIGHT_PAREN)) {
+        do {
+            ++current_compiler->function->arity;
+            if (current_compiler->function->arity > 255) {
+                error_at_current("Can't have more that 255 parameters.");
+            }
+            // TODO: Handle const parameters.
+            int constant = parse_variable("Expected parameter name", false);
+            define_variable(constant, false);
+        } while (matches_token(TOKEN_COMMA));
+    }
+
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after parameters.");
+    consume_if_matches(TOKEN_LEFT_BRACE, "Expected '{' before function body.");
+    block_statement();
+
+    object_function* function = end_compilation();
+    emit_constant(OBJECT_VALUE(function));
+}
+
+static void function_declaration(void) {
+    int global = parse_variable("Expected function name.", false);
+    mark_initialized();
+    compile_function(TYPE_FUNCTION);
+    define_variable(global, false);
 }
 
 static void switch_statement(void) {
@@ -868,7 +953,7 @@ static void if_statement(void) {
 }
 
 static void variable_declaration(bool is_const) {
-    int var_index = parse_variable(is_const);
+    int var_index = parse_variable("Expected variable name.", is_const);
 
     if (matches_token(TOKEN_EQUAL)) {
         parse_expression();
@@ -912,7 +997,9 @@ static void synchronize(void) {
 }
 
 static void declaration_statement(void) {
-    if (matches_token(TOKEN_VAR)) {
+    if (matches_token(TOKEN_FUNC)) {
+        function_declaration();
+    } else if (matches_token(TOKEN_VAR)) {
         variable_declaration(false);
     } else if (matches_token(TOKEN_CONST)) {
         variable_declaration(true);
@@ -937,6 +1024,8 @@ static void statement(void) {
         for_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();
+    } else if (matches_token(TOKEN_RETURN)) {
+        return_statement();
     } else if (matches_token(TOKEN_WHILE)) {
         while_statement();
     } else if (matches_token(TOKEN_LEFT_BRACE)) {

@@ -95,15 +95,56 @@ static void runtime_error(const char* format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    call_frame* frame = &vm.frames[vm.frame_count - 1];
-    size_t instruction = frame->ip - frame->function->chunk.code - 1;
-    int line = get_line(&frame->function->chunk, instruction);
+    fprintf(stderr, "== stack trace ==\n");
+    for (int i = vm.frame_count - 1; i >= 0; --i) {
+        call_frame* frame = &vm.frames[i];
+        object_function* function = frame->function;
+        size_t instruction = frame->ip - function->chunk.code - 1;
+        fprintf(stderr, "[line %d] in ", get_line(&frame->function->chunk, instruction));
+        if (function->name == NULL) {
+            fprintf(stderr, "script\n");
+        } else {
+            fprintf(stderr, "%s()\n", function->name->chars);
+        }
+    }
+    fprintf(stderr, "== end stack trace ==\n");
 
-    fprintf(stderr, "[line %d] in script\n", line);
     reset_stack();
 }
 
 static clox_value virtual_machine_stack_peek(int distance) { return vm.stack_top[-1 - distance]; }
+
+static bool call_function(object_function* function, int arg_count) {
+    if (arg_count != function->arity) {
+        runtime_error("Expected %d arguments but got %d.", function->arity, arg_count);
+        return false;
+    }
+
+    if (vm.frame_count == FRAMES_MAX) {
+        runtime_error("== STACK OVERFLOW ==");
+        return false;
+    }
+
+    call_frame* frame = &vm.frames[vm.frame_count++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    frame->slots = vm.stack_top - arg_count - 1;
+    return true;
+}
+
+static bool call_value(clox_value callee, int arg_count) {
+    if (IS_OBJECT(callee)) {
+        switch (OBJECT_TYPE(callee)) {
+            case OBJECT_FUNCTION: {
+                return call_function(AS_FUNCTION(callee), arg_count);
+            } break;
+            default:
+                break;
+        }
+    }
+    runtime_error("Can only call '()' functions and classes.");
+    return false;
+}
 
 static bool is_falsey(clox_value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
@@ -353,9 +394,25 @@ static interpret_result virtual_machine_run(void) {
                 uint16_t offset = READ_SHORT();
                 frame->ip -= offset;
             } break;
+            case OP_CALL: {
+                int arg_count = READ_BYTE();
+                if (!call_value(virtual_machine_stack_peek(arg_count), arg_count)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
+            } break;
             case OP_RETURN: {
-                return INTERPRET_OK;
-            }
+                clox_value result = virtual_machine_stack_pop();
+                --vm.frame_count;
+                if (vm.frame_count == 0) {
+                    virtual_machine_stack_pop();
+                    return INTERPRET_OK;
+                }
+
+                vm.stack_top = frame->slots;
+                virtual_machine_stack_push(result);
+                frame = &vm.frames[vm.frame_count - 1];
+            } break;
             case OP_DEBUG: {
                 virtual_machine_debug(frame);
                 return INTERPRET_OK;
@@ -381,17 +438,8 @@ interpret_result virtual_machine_interpret(const char* source_code) {
     }
 
     virtual_machine_stack_push(OBJECT_VALUE(function));
-    call_frame* frame = &vm.frames[vm.frame_count++];
-    frame->function = function;
-    frame->ip = function->chunk.code;
-    frame->slots = vm.stack;
+    call_function(function, 0);
 
     interpret_result result = virtual_machine_run();
-
-    if (result == INTERPRET_OK && vm.stack_top > vm.stack) {
-        // Pop the function that is implicity held at stack slot 1 here.
-        virtual_machine_stack_pop();
-    }
-
     return result;
 }
