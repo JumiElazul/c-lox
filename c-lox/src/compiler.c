@@ -501,7 +501,6 @@ parse_rule rules[] = {
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_NULL] = {literal, NULL, PREC_NONE},
     [TOKEN_OR] = {NULL, or_, PREC_OR},
-    [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
     [TOKEN_SWITCH] = {NULL, NULL, PREC_NONE},
@@ -718,12 +717,6 @@ static void or_(bool can_assign) {
 static parse_rule* get_rule(token_type type) { return &rules[type]; }
 
 static void parse_expression(void) { parse_precedence(PREC_ASSIGNMENT); }
-
-static void print_statement(void) {
-    parse_expression();
-    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after value.");
-    emit_byte(OP_PRINT);
-}
 
 static void return_statement(void) {
     if (current_compiler->type == TYPE_SCRIPT) {
@@ -972,7 +965,6 @@ static void synchronize(void) {
             case TOKEN_FOR:
             case TOKEN_IF:
             case TOKEN_WHILE:
-            case TOKEN_PRINT:
             case TOKEN_RETURN:
                 return;
             default:;
@@ -1004,9 +996,7 @@ static void statement(void) {
         return;
     }
 
-    if (matches_token(TOKEN_PRINT)) {
-        print_statement();
-    } else if (matches_token(TOKEN_FOR)) {
+    if (matches_token(TOKEN_FOR)) {
         for_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();

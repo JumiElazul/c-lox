@@ -16,12 +16,16 @@ static clox_value clock_native(int arg_count, clox_value* args) {
 }
 
 static clox_value print_native(int arg_count, clox_value* args) {
-    print_value(args[0]);
+    for (int i = 0; i < arg_count; ++i) {
+        print_value(args[i]);
+    }
     return NULL_VALUE;
 }
 
 static clox_value println_native(int arg_count, clox_value* args) {
-    print_value(args[0]);
+    for (int i = 0; i < arg_count; ++i) {
+        print_value(args[i]);
+    }
     printf("\n");
     return NULL_VALUE;
 }
@@ -36,8 +40,8 @@ static void define_native(const char* name, native_fn function, int arity) {
 
 static void init_standard_library(void) {
     define_native("clock", clock_native, 0);
-    define_native("print", print_native, 1);
-    define_native("println", println_native, 1);
+    define_native("print", print_native, NATIVE_VARARGS);
+    define_native("println", println_native, NATIVE_VARARGS);
 }
 
 static void dump_constant_table(call_frame* frame) {
@@ -171,7 +175,7 @@ static bool call_value(clox_value callee, int arg_count) {
             } break;
             case OBJECT_NATIVE: {
                 object_native* native = AS_NATIVE(callee);
-                if (arg_count != native->arity) {
+                if (native->arity >= 0 && arg_count != native->arity) {
                     fprintf(stderr, "<native fn: %s> : ", native->name);
                     runtime_error("Incorrect number of arguments passed to function.");
                     return false;
@@ -422,10 +426,6 @@ static interpret_result virtual_machine_run(void) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 virtual_machine_stack_push(NUMBER_VALUE(-AS_NUMBER(virtual_machine_stack_pop())));
-            } break;
-            case OP_PRINT: {
-                print_value(virtual_machine_stack_pop());
-                printf("\n");
             } break;
             case OP_JUMP: {
                 uint16_t offset = READ_SHORT();

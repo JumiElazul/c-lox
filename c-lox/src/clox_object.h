@@ -29,6 +29,7 @@ typedef struct {
     object_string* name;
 } object_function;
 
+#define NATIVE_VARARGS -1
 typedef clox_value (*native_fn)(int arg_count, clox_value* args);
 
 typedef struct {
