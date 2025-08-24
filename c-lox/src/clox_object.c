@@ -43,6 +43,14 @@ object_function* new_function(void) {
     return function;
 }
 
+object_native* new_native(native_fn function, const char* name, int arity) {
+    object_native* native = ALLOCATE_OBJECT(object_native, OBJECT_NATIVE);
+    native->arity = arity;
+    native->function = function;
+    native->name = name;
+    return native;
+}
+
 object_string* take_string(char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
 
@@ -84,6 +92,9 @@ void print_object(clox_value val) {
     switch (OBJECT_TYPE(val)) {
         case OBJECT_FUNCTION:
             print_function(AS_FUNCTION(val));
+            break;
+        case OBJECT_NATIVE:
+            printf("<native fn>");
             break;
         case OBJECT_STRING:
             printf("%s", AS_CSTRING(val));

@@ -5,9 +5,40 @@
 #include "memory.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 virtual_machine vm;
+
+static clox_value clock_native(int arg_count, clox_value* args) {
+    return NUMBER_VALUE((double)clock() / CLOCKS_PER_SEC);
+}
+
+static clox_value print_native(int arg_count, clox_value* args) {
+    print_value(args[0]);
+    return NULL_VALUE;
+}
+
+static clox_value println_native(int arg_count, clox_value* args) {
+    print_value(args[0]);
+    printf("\n");
+    return NULL_VALUE;
+}
+
+static void define_native(const char* name, native_fn function, int arity) {
+    virtual_machine_stack_push(OBJECT_VALUE(copy_string(name, (int)strlen(name))));
+    virtual_machine_stack_push(OBJECT_VALUE(new_native(function, name, arity)));
+    hash_table_set(&vm.global_variables, AS_STRING(vm.stack[0]), vm.stack[1]);
+    virtual_machine_stack_pop();
+    virtual_machine_stack_pop();
+}
+
+static void init_standard_library(void) {
+    define_native("clock", clock_native, 0);
+    define_native("print", print_native, 1);
+    define_native("println", println_native, 1);
+}
 
 static void dump_constant_table(call_frame* frame) {
     printf("constant table: [");
@@ -138,6 +169,19 @@ static bool call_value(clox_value callee, int arg_count) {
             case OBJECT_FUNCTION: {
                 return call_function(AS_FUNCTION(callee), arg_count);
             } break;
+            case OBJECT_NATIVE: {
+                object_native* native = AS_NATIVE(callee);
+                if (arg_count != native->arity) {
+                    fprintf(stderr, "<native fn: %s> : ", native->name);
+                    runtime_error("Incorrect number of arguments passed to function.");
+                    return false;
+                }
+
+                clox_value result = native->function(arg_count, vm.stack_top - arg_count);
+                vm.stack_top -= arg_count + 1;
+                virtual_machine_stack_push(result);
+                return true;
+            } break;
             default:
                 break;
         }
@@ -170,6 +214,8 @@ void init_virtual_machine(void) {
     init_hash_table(&vm.global_variables);
     init_hash_table(&vm.global_consts);
     init_hash_table(&vm.interned_strings);
+
+    init_standard_library();
 }
 
 void free_virtual_machine(void) {
@@ -225,6 +271,7 @@ static interpret_result virtual_machine_run(void) {
     while (true) {
 #ifdef DEBUG_TRACE_EXECUTION
         dump_stack();
+        dump_global_variables();
         disassemble_instruction(&frame->function->chunk,
                                 (int)(frame->ip - frame->function->chunk.code));
 #endif

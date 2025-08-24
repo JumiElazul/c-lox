@@ -8,8 +8,6 @@ set(CLOX_SOURCES
     "src/compiler.c"
     "src/disassembler.h"
     "src/disassembler.c"
-    "src/identifier_cache.h"
-    "src/identifier_cache.c"
     "src/hash_table.h"
     "src/hash_table.c"
     "src/lexer.h"
@@ -50,6 +48,10 @@ target_compile_options(${CLOX_EXE_NAME} PRIVATE
 
 target_link_options(${CLOX_EXE_NAME} PRIVATE
     $<$<CONFIG:Debug>:-fsanitize=address;-fsanitize=undefined>
+)
+
+target_compile_definitions(${CLOX_EXE_NAME} PRIVATE
+    $<$<CONFIG:Debug>:DEBUG_PRINT_CODE;DEBUG_TRACE_EXECUTION>
 )
 
 message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")

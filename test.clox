@@ -1,0 +1,15 @@
+func a(p1) {
+    print p1;
+    var l1 = 1;
+    var l2 = 2;
+
+    func b(p2, p3) {
+        var l3 = 3;
+        var l4 = 4;
+        print p2 + p3;
+    }
+
+    b("hello", " world");
+}
+
+a("enter a");
