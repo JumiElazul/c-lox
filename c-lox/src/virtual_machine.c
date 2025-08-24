@@ -164,7 +164,7 @@ static bool call_value(clox_value callee, int arg_count) {
                 object_native* native = AS_NATIVE(callee);
                 if (arg_count < native->min_arity ||
                     (native->max_arity >= 0 && arg_count > native->max_arity)) {
-                    fprintf(stderr, "<native fn: %s> : ", native->name);
+                    fprintf(stderr, "<native fn: %s> ", native->name);
                     runtime_error("Incorrect number of arguments passed to native function.");
                     return false;
                 }

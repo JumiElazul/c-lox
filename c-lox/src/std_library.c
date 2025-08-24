@@ -1,5 +1,7 @@
+#include "memory.h"
 #include "stdlib.h"
 #include "virtual_machine.h"
+#include <ctype.h>
 #include <editline/readline.h>
 #include <string.h>
 #include <time.h>
@@ -16,6 +18,25 @@
         if (!(condition))                                                                          \
             NATIVE_FAIL(__VA_ARGS__);                                                              \
     } while (false)
+
+static bool same_string(const char* str, int len, int (*char_fn)(int)) {
+    for (int i = 0; i < len; ++i) {
+        unsigned char ch = (unsigned char)str[i];
+        if ((char)char_fn(ch) != str[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static char* char_op_impl(const char* str, int len, int (*char_fn)(int)) {
+    char* out = ALLOCATE(char, len + 1);
+    for (int i = 0; i < len; ++i) {
+        out[i] = (char)char_fn((unsigned char)str[i]);
+    }
+    out[len] = '\0';
+    return out;
+}
 
 static clox_value clock_native(int argc, clox_value* args) {
     (void)args;
@@ -55,9 +76,56 @@ static clox_value get_line_native(int argc, clox_value* args) {
     return OBJECT_VALUE(s);
 }
 
+static clox_value length_native(int argc, clox_value* args) {
+    NATIVE_REQUIRE(argc == 1, "length takes 1 argument.");
+    NATIVE_REQUIRE(IS_STRING(args[0]), "length takes argument of type 'string'.");
+
+    object_string* string = AS_STRING(args[0]);
+    return NUMBER_VALUE(string->length);
+}
+
+static clox_value to_upper_native(int argc, clox_value* args) {
+    NATIVE_REQUIRE(argc == 1, "to_upper takes 1 argument.");
+    NATIVE_REQUIRE(IS_STRING(args[0]), "to_upper takes argument of type 'string'.");
+
+    object_string* s = AS_STRING(args[0]);
+    const char* input_str = s->chars;
+    int len = s->length;
+
+    if (same_string(input_str, len, toupper)) {
+        return OBJECT_VALUE(s);
+    }
+
+    char* out = char_op_impl(input_str, len, toupper);
+    object_string* res = take_string(out, len);
+    return OBJECT_VALUE(res);
+}
+
+static clox_value to_lower_native(int argc, clox_value* args) {
+    NATIVE_REQUIRE(argc == 1, "to_lower takes 1 argument.");
+    NATIVE_REQUIRE(IS_STRING(args[0]), "to_lower takes argument of type 'string'.");
+
+    object_string* s = AS_STRING(args[0]);
+    const char* input_str = s->chars;
+    int len = s->length;
+
+    if (same_string(input_str, len, tolower)) {
+        return OBJECT_VALUE(s);
+    }
+
+    char* out = char_op_impl(input_str, len, tolower);
+    object_string* res = take_string(out, len);
+    return OBJECT_VALUE(res);
+}
+
 void stdlib_init(void) {
     virtual_machine_register_native("clock", clock_native, 0, 0);
+
     virtual_machine_register_native("print", print_native, NATIVE_VARARGS);
     virtual_machine_register_native("println", println_native, NATIVE_VARARGS);
     virtual_machine_register_native("get_line", get_line_native, 0, 1);
+
+    virtual_machine_register_native("length", length_native, 1, 1);
+    virtual_machine_register_native("to_upper", to_upper_native, 1, 1);
+    virtual_machine_register_native("to_lower", to_lower_native, 1, 1);
 }
