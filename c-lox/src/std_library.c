@@ -40,7 +40,6 @@ static clox_value println_native(int argc, clox_value* args) {
 static clox_value get_line_native(int argc, clox_value* args) {
     NATIVE_REQUIRE(argc <= 1, "get_line takes 0 or 1 arguments.");
 
-    char* prompt = NULL;
     if (argc == 1) {
         print_value(args[0]);
     }
