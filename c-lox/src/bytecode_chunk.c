@@ -63,7 +63,7 @@ void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
     encode_line_run(chunk, line);
 }
 
-int get_line(bytecode_chunk* chunk, int instr_index) {
+int get_source_line(bytecode_chunk* chunk, int instr_index) {
     if (instr_index < 0 || instr_index >= chunk->count) {
         return -1;
     }

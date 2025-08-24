@@ -1,6 +1,5 @@
 #ifndef JUMI_CLOX_VIRTUAL_MACHINE_H
 #define JUMI_CLOX_VIRTUAL_MACHINE_H
-#include "bytecode_chunk.h"
 #include "clox_value.h"
 #include "hash_table.h"
 
@@ -23,6 +22,9 @@ typedef struct {
     hash_table global_consts;
     hash_table interned_strings;
     object* objects;
+
+    bool native_failed;
+    char native_error_msg[256];
 } virtual_machine;
 
 typedef enum {
@@ -33,6 +35,9 @@ typedef enum {
 
 extern virtual_machine vm;
 
+void virtual_machine_native_errorf(const char* format, ...);
+void virtual_machine_register_native(const char* name, native_fn function, int min_arity,
+                                     int max_arity);
 void init_virtual_machine(void);
 void free_virtual_machine(void);
 void virtual_machine_stack_push(clox_value val);

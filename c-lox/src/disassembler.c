@@ -55,8 +55,8 @@ static int jump_instruction(const char* name, int sign, bytecode_chunk* chunk, i
 int disassemble_instruction(bytecode_chunk* chunk, int offset) {
     printf("%06d ", offset);
 
-    int line = get_line(chunk, offset);
-    if (offset > 0 && line == get_line(chunk, offset - 1)) {
+    int line = get_source_line(chunk, offset);
+    if (offset > 0 && line == get_source_line(chunk, offset - 1)) {
         printf("     | ");
     } else {
         printf("%6d ", line);

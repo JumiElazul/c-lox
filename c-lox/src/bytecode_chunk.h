@@ -69,6 +69,6 @@ int add_constant(bytecode_chunk* chunk, clox_value val);
 u24_t construct_u24_t(int index);
 int deconstruct_u24_t(u24_t format);
 void write_to_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line);
-int get_line(bytecode_chunk* chunk, int index);
+int get_source_line(bytecode_chunk* chunk, int index);
 
 #endif

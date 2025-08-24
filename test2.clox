@@ -1,0 +1,3 @@
+println("Please enter an input: ");
+var i = get_line();
+println("You entered: ", i);

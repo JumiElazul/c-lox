@@ -4,6 +4,10 @@ set(CLOX_SOURCES
 
     "src/bytecode_chunk.h"
     "src/bytecode_chunk.c"
+    "src/clox_value.h"
+    "src/clox_value.c"
+    "src/clox_object.h"
+    "src/clox_object.c"
     "src/compiler.h"
     "src/compiler.c"
     "src/disassembler.h"
@@ -14,10 +18,8 @@ set(CLOX_SOURCES
     "src/lexer.c"
     "src/memory.h"
     "src/memory.c"
-    "src/clox_value.h"
-    "src/clox_value.c"
-    "src/clox_object.h"
-    "src/clox_object.c"
+    "src/std_library.h"
+    "src/std_library.c"
     "src/virtual_machine.h"
     "src/virtual_machine.c"
 )

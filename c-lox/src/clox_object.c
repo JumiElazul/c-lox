@@ -43,9 +43,10 @@ object_function* new_function(void) {
     return function;
 }
 
-object_native* new_native(native_fn function, const char* name, int arity) {
+object_native* new_native(native_fn function, const char* name, int min_arity, int max_arity) {
     object_native* native = ALLOCATE_OBJECT(object_native, OBJECT_NATIVE);
-    native->arity = arity;
+    native->min_arity = min_arity;
+    native->max_arity = max_arity;
     native->function = function;
     native->name = name;
     return native;

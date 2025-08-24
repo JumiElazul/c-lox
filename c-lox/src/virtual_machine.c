@@ -3,6 +3,9 @@
 #include "compiler.h"
 #include "disassembler.h"
 #include "memory.h"
+#include "std_library.h"
+#include <assert.h>
+#include <editline/readline.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,37 +14,21 @@
 
 virtual_machine vm;
 
-static clox_value clock_native(int arg_count, clox_value* args) {
-    return NUMBER_VALUE((double)clock() / CLOCKS_PER_SEC);
+void virtual_machine_native_errorf(const char* fmt, ...) {
+    vm.native_failed = true;
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(vm.native_error_msg, sizeof(vm.native_error_msg), fmt, args);
+    va_end(args);
 }
 
-static clox_value print_native(int arg_count, clox_value* args) {
-    for (int i = 0; i < arg_count; ++i) {
-        print_value(args[i]);
-    }
-    return NULL_VALUE;
-}
-
-static clox_value println_native(int arg_count, clox_value* args) {
-    for (int i = 0; i < arg_count; ++i) {
-        print_value(args[i]);
-    }
-    printf("\n");
-    return NULL_VALUE;
-}
-
-static void define_native(const char* name, native_fn function, int arity) {
+void virtual_machine_register_native(const char* name, native_fn function, int min_arity,
+                                     int max_arity) {
     virtual_machine_stack_push(OBJECT_VALUE(copy_string(name, (int)strlen(name))));
-    virtual_machine_stack_push(OBJECT_VALUE(new_native(function, name, arity)));
+    virtual_machine_stack_push(OBJECT_VALUE(new_native(function, name, min_arity, max_arity)));
     hash_table_set(&vm.global_variables, AS_STRING(vm.stack[0]), vm.stack[1]);
     virtual_machine_stack_pop();
     virtual_machine_stack_pop();
-}
-
-static void init_standard_library(void) {
-    define_native("clock", clock_native, 0);
-    define_native("print", print_native, NATIVE_VARARGS);
-    define_native("println", println_native, NATIVE_VARARGS);
 }
 
 static void dump_constant_table(call_frame* frame) {
@@ -135,7 +122,7 @@ static void runtime_error(const char* format, ...) {
         call_frame* frame = &vm.frames[i];
         object_function* function = frame->function;
         size_t instruction = frame->ip - function->chunk.code - 1;
-        fprintf(stderr, "[line %d] in ", get_line(&frame->function->chunk, instruction));
+        fprintf(stderr, "[line %d] in ", get_source_line(&frame->function->chunk, instruction));
         if (function->name == NULL) {
             fprintf(stderr, "script\n");
         } else {
@@ -175,14 +162,23 @@ static bool call_value(clox_value callee, int arg_count) {
             } break;
             case OBJECT_NATIVE: {
                 object_native* native = AS_NATIVE(callee);
-                if (native->arity >= 0 && arg_count != native->arity) {
+                if (arg_count < native->min_arity ||
+                    (native->max_arity >= 0 && arg_count > native->max_arity)) {
                     fprintf(stderr, "<native fn: %s> : ", native->name);
-                    runtime_error("Incorrect number of arguments passed to function.");
+                    runtime_error("Incorrect number of arguments passed to native function.");
                     return false;
                 }
 
+                vm.native_failed = false;
                 clox_value result = native->function(arg_count, vm.stack_top - arg_count);
                 vm.stack_top -= arg_count + 1;
+
+                if (vm.native_failed) {
+                    runtime_error("%s",
+                                  vm.native_error_msg[0] ? vm.native_error_msg : "<native error>");
+                    return false;
+                }
+
                 virtual_machine_stack_push(result);
                 return true;
             } break;
@@ -219,7 +215,7 @@ void init_virtual_machine(void) {
     init_hash_table(&vm.global_consts);
     init_hash_table(&vm.interned_strings);
 
-    init_standard_library();
+    stdlib_init();
 }
 
 void free_virtual_machine(void) {

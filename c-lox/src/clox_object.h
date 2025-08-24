@@ -29,14 +29,14 @@ typedef struct {
     object_string* name;
 } object_function;
 
-#define NATIVE_VARARGS -1
 typedef clox_value (*native_fn)(int arg_count, clox_value* args);
 
 typedef struct {
     object obj;
-    int arity;
     native_fn function;
     const char* name;
+    int min_arity;
+    int max_arity;
 } object_native;
 
 struct object_string {
@@ -47,7 +47,7 @@ struct object_string {
 };
 
 object_function* new_function(void);
-object_native* new_native(native_fn function, const char* name, int arity);
+object_native* new_native(native_fn function, const char* name, int min_arity, int max_arity);
 object_string* take_string(char* chars, int length);
 object_string* copy_string(const char* chars, int length);
 void print_function(object_function* val);
