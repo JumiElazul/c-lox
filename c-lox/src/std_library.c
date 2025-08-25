@@ -201,6 +201,46 @@ static clox_value substring_native(int argc, clox_value* args) {
     return OBJECT_VALUE(out);
 }
 
+static clox_value read_file_native(int argc, clox_value* args) {
+    NATIVE_ARG_REQUIRE_RANGE("read_file", argc, 1, 2);
+    NATIVE_ARG_REQUIRE_STRING("read_file", args, 0);
+    if (argc == 2) {
+        NATIVE_ARG_REQUIRE_BOOL("read_file", args, 1);
+    }
+
+    object_string* str = AS_STRING(args[0]);
+    const char* filepath = str->chars;
+    // bool binary = AS_BOOL(args[1]);
+
+    // TODO: Handle binary boolean and cross platform string weirdness.
+    FILE* file = fopen(filepath, "rb");
+    if (!file) {
+        NATIVE_FAIL("Filepath could not be opened.", filepath);
+    }
+
+    fseek(file, 0, SEEK_END);
+    long filesize = ftell(file);
+    rewind(file);
+
+    char* file_buf = (char*)ALLOCATE(char, filesize + 1);
+    if (!file_buf) {
+        fclose(file);
+        NATIVE_FAIL("Could not allocate memory for file.");
+    }
+
+    size_t bytes_read = fread(file_buf, sizeof(char), filesize, file);
+    if (bytes_read < (size_t)filesize) {
+        fclose(file);
+        NATIVE_FAIL("Could not read entire file, an error has occurred.");
+    }
+
+    file_buf[bytes_read] = '\0';
+    fclose(file);
+
+    object_string* file_contents = take_string(file_buf, bytes_read);
+    return OBJECT_VALUE(file_contents);
+}
+
 void stdlib_init(void) {
     virtual_machine_register_native("clock", clock_native, 0, 0);
 
@@ -212,4 +252,6 @@ void stdlib_init(void) {
     virtual_machine_register_native("to_upper", to_upper_native, 1, 1);
     virtual_machine_register_native("to_lower", to_lower_native, 1, 1);
     virtual_machine_register_native("substring", substring_native, 2, 3);
+
+    virtual_machine_register_native("read_file", read_file_native, 1, 2);
 }
