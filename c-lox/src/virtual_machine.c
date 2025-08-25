@@ -150,6 +150,7 @@ static bool call_function(object_function* function, int arg_count) {
     call_frame* frame = &vm.frames[vm.frame_count++];
     frame->function = function;
     frame->ip = function->chunk.code;
+
     frame->slots = vm.stack_top - arg_count - 1;
     return true;
 }

@@ -35,6 +35,12 @@ static uint32_t hash_string(const char* key, int length) {
     return hash;
 }
 
+object_closure* new_closure(object_function* function) {
+    object_closure* closure = ALLOCATE_OBJECT(object_closure, OBJECT_CLOSURE);
+    closure->function = function;
+    return closure;
+}
+
 object_function* new_function(void) {
     object_function* function = ALLOCATE_OBJECT(object_function, OBJECT_FUNCTION);
     function->arity = 0;
@@ -91,6 +97,8 @@ void print_string(object_string* str) { printf("%s", str->chars); }
 
 void print_object(clox_value val) {
     switch (OBJECT_TYPE(val)) {
+        case OBJECT_CLOSURE:
+            print_function(AS_CLOSURE(val)->function);
         case OBJECT_FUNCTION:
             print_function(AS_FUNCTION(val));
             break;
