@@ -35,12 +35,12 @@ static void dump_constant_table(call_frame* frame) {
     printf("constant table: [");
     bool first = true;
 
-    for (int i = 0; i < frame->function->chunk.constants.count; ++i) {
+    for (int i = 0; i < frame->closure->function->chunk.constants.count; ++i) {
         if (!first) {
             printf(", ");
         }
 
-        print_value(frame->function->chunk.constants.values[i]);
+        print_value(frame->closure->function->chunk.constants.values[i]);
         first = false;
     }
     printf("]\n");
@@ -120,9 +120,10 @@ static void runtime_error(const char* format, ...) {
     fprintf(stderr, "== stack trace ==\n");
     for (int i = vm.frame_count - 1; i >= 0; --i) {
         call_frame* frame = &vm.frames[i];
-        object_function* function = frame->function;
+        object_function* function = frame->closure->function;
         size_t instruction = frame->ip - function->chunk.code - 1;
-        fprintf(stderr, "[line %d] in ", get_source_line(&frame->function->chunk, instruction));
+        fprintf(stderr, "[line %d] in ",
+                get_source_line(&frame->closure->function->chunk, instruction));
         if (function->name == NULL) {
             fprintf(stderr, "script\n");
         } else {
@@ -136,9 +137,9 @@ static void runtime_error(const char* format, ...) {
 
 static clox_value virtual_machine_stack_peek(int distance) { return vm.stack_top[-1 - distance]; }
 
-static bool call_function(object_function* function, int arg_count) {
-    if (arg_count != function->arity) {
-        runtime_error("Expected %d arguments but got %d.", function->arity, arg_count);
+static bool call_function(object_closure* closure, int arg_count) {
+    if (arg_count != closure->function->arity) {
+        runtime_error("Expected %d arguments but got %d.", closure->function->arity, arg_count);
         return false;
     }
 
@@ -148,8 +149,8 @@ static bool call_function(object_function* function, int arg_count) {
     }
 
     call_frame* frame = &vm.frames[vm.frame_count++];
-    frame->function = function;
-    frame->ip = function->chunk.code;
+    frame->closure = closure;
+    frame->ip = closure->function->chunk.code;
 
     frame->slots = vm.stack_top - arg_count - 1;
     return true;
@@ -158,8 +159,8 @@ static bool call_function(object_function* function, int arg_count) {
 static bool call_value(clox_value callee, int arg_count) {
     if (IS_OBJECT(callee)) {
         switch (OBJECT_TYPE(callee)) {
-            case OBJECT_FUNCTION: {
-                return call_function(AS_FUNCTION(callee), arg_count);
+            case OBJECT_CLOSURE: {
+                return call_function(AS_CLOSURE(callee), arg_count);
             } break;
             case OBJECT_NATIVE: {
                 object_native* native = AS_NATIVE(callee);
@@ -244,7 +245,7 @@ static interpret_result virtual_machine_run(void) {
 
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
+#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type, op)                                                                  \
     do {                                                                                           \
@@ -267,8 +268,8 @@ static interpret_result virtual_machine_run(void) {
 #ifdef DEBUG_TRACE_EXECUTION
         dump_stack();
         dump_global_variables();
-        disassemble_instruction(&frame->function->chunk,
-                                (int)(frame->ip - frame->function->chunk.code));
+        disassemble_instruction(&frame->closure->function->chunk,
+                                (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
 
         uint8_t instruction;
@@ -281,7 +282,7 @@ static interpret_result virtual_machine_run(void) {
             case OP_CONSTANT_LONG: {
                 int reconstructed_index = READ_U24(frame);
                 virtual_machine_stack_push(
-                    frame->function->chunk.constants.values[reconstructed_index]);
+                    frame->closure->function->chunk.constants.values[reconstructed_index]);
             } break;
             case OP_NULL: {
                 virtual_machine_stack_push(NULL_VALUE);
@@ -317,8 +318,8 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_GET_GLOBAL_LONG: {
                 int reconstructed_index = READ_U24(frame);
-                object_string* name =
-                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
+                object_string* name = AS_STRING(
+                    frame->closure->function->chunk.constants.values[reconstructed_index]);
                 clox_value val;
                 if (!hash_table_get(&vm.global_variables, name, &val)) {
                     runtime_error("Undefined variable '%s'.", name->chars);
@@ -339,15 +340,15 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_DEFINE_GLOBAL_LONG: {
                 int reconstructed_index = READ_U24(frame);
-                object_string* name =
-                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
+                object_string* name = AS_STRING(
+                    frame->closure->function->chunk.constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_LONG_CONST: {
                 int reconstructed_index = READ_U24(frame);
-                object_string* name =
-                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
+                object_string* name = AS_STRING(
+                    frame->closure->function->chunk.constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
                 virtual_machine_stack_pop();
@@ -368,8 +369,8 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_SET_GLOBAL_LONG: {
                 int reconstructed_index = READ_U24(frame);
-                object_string* name =
-                    AS_STRING(frame->function->chunk.constants.values[reconstructed_index]);
+                object_string* name = AS_STRING(
+                    frame->closure->function->chunk.constants.values[reconstructed_index]);
                 if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);
@@ -439,6 +440,11 @@ static interpret_result virtual_machine_run(void) {
                 }
                 frame = &vm.frames[vm.frame_count - 1];
             } break;
+            case OP_CLOSURE: {
+                object_function* function = AS_FUNCTION(READ_CONSTANT());
+                object_closure* closure = new_closure(function);
+                virtual_machine_stack_push(OBJECT_VALUE(closure));
+            } break;
             case OP_RETURN: {
                 clox_value result = virtual_machine_stack_pop();
                 --vm.frame_count;
@@ -476,7 +482,10 @@ interpret_result virtual_machine_interpret(const char* source_code) {
     }
 
     virtual_machine_stack_push(OBJECT_VALUE(function));
-    call_function(function, 0);
+    object_closure* closure = new_closure(function);
+    virtual_machine_stack_pop();
+    virtual_machine_stack_push(OBJECT_VALUE(closure));
+    call_function(closure, 0);
 
     interpret_result result = virtual_machine_run();
     return result;

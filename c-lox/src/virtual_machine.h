@@ -7,7 +7,7 @@
 #define FRAMES_MAX 64
 
 typedef struct {
-    object_function* function;
+    object_closure* closure;
     uint8_t* ip;
     clox_value* slots;
 } call_frame;

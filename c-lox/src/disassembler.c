@@ -124,6 +124,14 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
             return jump_instruction("OP_LOOP", -1, chunk, offset);
         case OP_CALL:
             return byte_instruction("OP_CALL", chunk, offset);
+        case OP_CLOSURE:
+            // TODO: Handle long instructions.
+            ++offset;
+            uint8_t constant = chunk->code[offset++];
+            printf("%-24s %6d ", "OP_CLOSURE", constant);
+            print_value(chunk->constants.values[constant]);
+            printf("\n");
+            return offset;
         case OP_RETURN:
             return simple_instruction("OP_RETURN", offset);
         case OP_DEBUG:

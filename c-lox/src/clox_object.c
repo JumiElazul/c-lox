@@ -99,6 +99,7 @@ void print_object(clox_value val) {
     switch (OBJECT_TYPE(val)) {
         case OBJECT_CLOSURE:
             print_function(AS_CLOSURE(val)->function);
+            break;
         case OBJECT_FUNCTION:
             print_function(AS_FUNCTION(val));
             break;

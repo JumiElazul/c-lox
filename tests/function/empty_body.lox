@@ -1,2 +1,0 @@
-func f() {}
-print f(); // expect: null
