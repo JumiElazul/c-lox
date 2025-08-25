@@ -20,6 +20,8 @@ set(CLOX_SOURCES
     "src/memory.c"
     "src/std_library.h"
     "src/std_library.c"
+    "src/utility.h"
+    "src/utility.c"
     "src/virtual_machine.h"
     "src/virtual_machine.c"
 )

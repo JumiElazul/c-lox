@@ -1,5 +1,6 @@
 #include "memory.h"
 #include "stdlib.h"
+#include "utility.h"
 #include "virtual_machine.h"
 #include <ctype.h>
 #include <editline/readline.h>
@@ -81,6 +82,12 @@ static char* char_op_impl(const char* str, int len, int (*char_fn)(int)) {
     }
     out[len] = '\0';
     return out;
+}
+
+static object_string* null_char(void) {
+    char* nc = ALLOCATE(char, 1);
+    object_string* s = take_string(nc, 0);
+    return s;
 }
 
 static clox_value clock_native(int argc, clox_value* args) {
@@ -201,44 +208,59 @@ static clox_value substring_native(int argc, clox_value* args) {
     return OBJECT_VALUE(out);
 }
 
-static clox_value read_file_native(int argc, clox_value* args) {
-    NATIVE_ARG_REQUIRE_RANGE("read_file", argc, 1, 2);
-    NATIVE_ARG_REQUIRE_STRING("read_file", args, 0);
-    if (argc == 2) {
-        NATIVE_ARG_REQUIRE_BOOL("read_file", args, 1);
-    }
+static clox_value file_exists_native(int argc, clox_value* args) {
+    NATIVE_ARG_REQUIRE_RANGE("file_exists", argc, 1, 1);
+    NATIVE_ARG_REQUIRE_STRING("file_exists", args, 0);
 
     object_string* str = AS_STRING(args[0]);
-    const char* filepath = str->chars;
-    // bool binary = AS_BOOL(args[1]);
+    bool exists = file_exists(str->chars);
+    return BOOL_VALUE(exists);
+}
 
-    // TODO: Handle binary boolean and cross platform string weirdness.
-    FILE* file = fopen(filepath, "rb");
-    if (!file) {
-        NATIVE_FAIL("Filepath could not be opened.", filepath);
+static clox_value read_file_native(int argc, clox_value* args) {
+    NATIVE_ARG_REQUIRE_RANGE("read_file", argc, 1, 1);
+    NATIVE_ARG_REQUIRE_STRING("read_file", args, 0);
+
+    object_string* filepath = AS_STRING(args[0]);
+    char* file = read_file(filepath->chars);
+
+    if (file == NULL) {
+        return OBJECT_VALUE(null_char());
     }
 
-    fseek(file, 0, SEEK_END);
-    long filesize = ftell(file);
-    rewind(file);
+    size_t s = strlen(file);
 
-    char* file_buf = (char*)ALLOCATE(char, filesize + 1);
-    if (!file_buf) {
-        fclose(file);
-        NATIVE_FAIL("Could not allocate memory for file.");
-    }
-
-    size_t bytes_read = fread(file_buf, sizeof(char), filesize, file);
-    if (bytes_read < (size_t)filesize) {
-        fclose(file);
-        NATIVE_FAIL("Could not read entire file, an error has occurred.");
-    }
-
-    file_buf[bytes_read] = '\0';
-    fclose(file);
-
-    object_string* file_contents = take_string(file_buf, bytes_read);
+    object_string* file_contents = take_string(file, s);
     return OBJECT_VALUE(file_contents);
+}
+
+static clox_value create_file_native(int argc, clox_value* args) {
+    NATIVE_ARG_REQUIRE_RANGE("create_file", argc, 1, 1);
+    NATIVE_ARG_REQUIRE_STRING("create_file", args, 0);
+
+    object_string* filepath = AS_STRING(args[0]);
+    if (!file_exists(filepath->chars)) {
+        create_file(filepath->chars);
+        return BOOL_VALUE(true);
+    } else {
+        return BOOL_VALUE(false);
+    }
+}
+
+static clox_value append_file_native(int argc, clox_value* args) {
+    NATIVE_ARG_REQUIRE_RANGE("append_file", argc, 2, 2);
+    NATIVE_ARG_REQUIRE_STRING("append_file", args, 0);
+    NATIVE_ARG_REQUIRE_STRING("append_file", args, 1);
+
+    object_string* filepath = AS_STRING(args[0]);
+    object_string* write = AS_STRING(args[1]);
+
+    if (file_exists(filepath->chars)) {
+        append_file(filepath->chars, write->chars);
+        return BOOL_VALUE(true);
+    } else {
+        return BOOL_VALUE(false);
+    }
 }
 
 void stdlib_init(void) {
@@ -253,5 +275,8 @@ void stdlib_init(void) {
     virtual_machine_register_native("to_lower", to_lower_native, 1, 1);
     virtual_machine_register_native("substring", substring_native, 2, 3);
 
-    virtual_machine_register_native("read_file", read_file_native, 1, 2);
+    virtual_machine_register_native("file_exists", file_exists_native, 1, 1);
+    virtual_machine_register_native("read_file", read_file_native, 1, 1);
+    virtual_machine_register_native("create_file", create_file_native, 1, 1);
+    virtual_machine_register_native("append_file", append_file_native, 2, 2);
 }
