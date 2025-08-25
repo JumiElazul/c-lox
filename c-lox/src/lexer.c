@@ -214,7 +214,7 @@ static token string(void) {
     }
 
     if (is_at_end()) {
-        return error_token("Uneterminated string.");
+        return error_token("Unterminated string.");
     }
 
     advance_lexer();

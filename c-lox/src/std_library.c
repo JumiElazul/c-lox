@@ -163,15 +163,42 @@ static clox_value to_lower_native(int argc, clox_value* args) {
 }
 
 static clox_value substring_native(int argc, clox_value* args) {
-    NATIVE_ARG_REQUIRE_RANGE("to_lower", argc, 2, 3);
-    NATIVE_ARG_REQUIRE_STRING("to_lower", args, 0);
-    NATIVE_ARG_REQUIRE_NUMBER("to_lower", args, 1);
+    NATIVE_ARG_REQUIRE_RANGE("substring", argc, 2, 3);
+    NATIVE_ARG_REQUIRE_STRING("substring", args, 0);
+    NATIVE_ARG_REQUIRE_NUMBER("substring", args, 1);
 
-    int end_pos = -1;
     if (argc == 3) {
-        NATIVE_ARG_REQUIRE_NUMBER("to_lower", args, 2);
-        end_pos = AS_NUMBER(args[2]);
+        NATIVE_ARG_REQUIRE_NUMBER("substring", args, 2);
     }
+
+    object_string* src = AS_STRING(args[0]);
+    const char* s = src->chars;
+    int n = src->length;
+
+    int start = (int)AS_NUMBER(args[1]);
+    int end = (argc == 3) ? (int)AS_NUMBER(args[2]) : n;
+
+    if (start < 0)
+        start += n;
+    if (end < 0)
+        end += n;
+
+    if (start < 0)
+        start = 0;
+    if (start > n)
+        start = n;
+    if (end < 0)
+        end = 0;
+    if (end > n)
+        end = n;
+
+    if (end < start)
+        end = start;
+
+    int sub_len = end - start;
+
+    object_string* out = copy_string(s + start, sub_len);
+    return OBJECT_VALUE(out);
 }
 
 void stdlib_init(void) {
