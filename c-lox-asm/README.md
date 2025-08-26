@@ -36,7 +36,6 @@ CONST 0 ; This is a comment
 
 Bytecode | Byte | Mnemonic |
 OP_CONSTANT |    |  0x00 |  CONST
-OP_CONSTANT_LONG |  0x01 |  CONST_LONG
 OP_ADD           |  0x02 |  ADD
 OP_SUBTRACT      |  0x03 |  SUB
 OP_MULTIPLY      |  0x04 |  MUL

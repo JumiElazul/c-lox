@@ -248,6 +248,16 @@ static void emit_return(void) {
     emit_byte(OP_RETURN);
 }
 
+static void emit_indexed(uint8_t op, int index) {
+    if (index <= 255) {
+        emit_bytes2(op, index);
+    } else {
+        u24_t idx = construct_u24_t(index);
+        emit_byte(OP_WIDE);
+        emit_bytes4(op, idx.hi, idx.mid, idx.lo);
+    }
+}
+
 static void emit_constant(clox_value val) {
     int index = add_constant(current_chunk(), val);
 
@@ -255,14 +265,7 @@ static void emit_constant(clox_value val) {
         error("Too many constants in one chunk.");
     }
 
-    bool long_instr = index > 255;
-
-    if (!long_instr) {
-        emit_bytes2(OP_CONSTANT, index);
-    } else {
-        u24_t i = construct_u24_t(index);
-        emit_bytes4(OP_CONSTANT_LONG, i.hi, i.mid, i.lo);
-    }
+    emit_indexed(OP_CONSTANT, index);
 }
 
 static void patch_jump(int offset) {
@@ -404,11 +407,10 @@ static void string(bool can_assign) {
 }
 
 static void named_variable(token name, bool can_assign) {
-    int local = resolve_local(current_compiler, &name);
-
     bool is_set = can_assign && matches_token(TOKEN_EQUAL);
 
     // Local path
+    int local = resolve_local(current_compiler, &name);
     if (local != -1) {
         local_variable* lv = &current_compiler->locals[local];
         bool is_const = lv->is_const;
@@ -424,21 +426,15 @@ static void named_variable(token name, bool can_assign) {
         emit_bytes2(is_set ? OP_SET_LOCAL : OP_GET_LOCAL, (uint8_t)local);
         return;
     }
+    // Upvalue path
 
     // Global path
     int global_index = identifier_constant(&name);
-    bool long_instr = global_index > 255;
-
     if (is_set) {
         parse_expression();
     }
 
-    if (!long_instr) {
-        emit_bytes2(is_set ? OP_SET_GLOBAL : OP_GET_GLOBAL, (uint8_t)global_index);
-    } else {
-        u24_t i = construct_u24_t(global_index);
-        emit_bytes4(is_set ? OP_SET_GLOBAL_LONG : OP_GET_GLOBAL_LONG, i.hi, i.mid, i.lo);
-    }
+    emit_indexed(is_set ? OP_SET_GLOBAL : OP_GET_GLOBAL, global_index);
 }
 
 static void variable(bool can_assign) { named_variable(parser.previous, can_assign); }
@@ -550,8 +546,7 @@ static int make_constant(clox_value val) {
 
 static int identifier_constant(token* name) {
     object_string* str = copy_string(name->start, name->length);
-    int index = make_constant(OBJECT_VALUE(str));
-    return index;
+    return make_constant(OBJECT_VALUE(str));
 }
 
 static bool identifiers_equal(token* a, token* b) {
@@ -645,15 +640,7 @@ static void define_variable(int global, bool is_const) {
         return;
     }
 
-    bool long_instr = global > 255;
-
-    if (!long_instr) {
-        emit_bytes2(is_const ? OP_DEFINE_GLOBAL_CONST : OP_DEFINE_GLOBAL, global);
-    } else {
-        u24_t i = construct_u24_t(global);
-        emit_bytes4(is_const ? OP_DEFINE_GLOBAL_LONG_CONST : OP_DEFINE_GLOBAL_LONG, i.hi, i.mid,
-                    i.lo);
-    }
+    emit_indexed(is_const ? OP_DEFINE_GLOBAL_CONST : OP_DEFINE_GLOBAL, global);
 }
 
 static uint8_t argument_list(void) {

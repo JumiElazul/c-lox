@@ -275,14 +275,12 @@ static interpret_result virtual_machine_run(void) {
         uint8_t instruction;
 
         switch (instruction = READ_BYTE()) {
+            case OP_WIDE: {
+                printf("ITS RAWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW\n");
+            } break;
             case OP_CONSTANT: {
                 clox_value constant = READ_CONSTANT();
                 virtual_machine_stack_push(constant);
-            } break;
-            case OP_CONSTANT_LONG: {
-                int reconstructed_index = READ_U24(frame);
-                virtual_machine_stack_push(
-                    frame->closure->function->chunk.constants.values[reconstructed_index]);
             } break;
             case OP_NULL: {
                 virtual_machine_stack_push(NULL_VALUE);
@@ -316,17 +314,6 @@ static interpret_result virtual_machine_run(void) {
                 }
                 virtual_machine_stack_push(val);
             } break;
-            case OP_GET_GLOBAL_LONG: {
-                int reconstructed_index = READ_U24(frame);
-                object_string* name = AS_STRING(
-                    frame->closure->function->chunk.constants.values[reconstructed_index]);
-                clox_value val;
-                if (!hash_table_get(&vm.global_variables, name, &val)) {
-                    runtime_error("Undefined variable '%s'.", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
-                }
-                virtual_machine_stack_push(val);
-            } break;
             case OP_DEFINE_GLOBAL: {
                 object_string* name = READ_STRING();
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
@@ -334,21 +321,6 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_DEFINE_GLOBAL_CONST: {
                 object_string* name = READ_STRING();
-                hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
-                hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
-                virtual_machine_stack_pop();
-            } break;
-            case OP_DEFINE_GLOBAL_LONG: {
-                int reconstructed_index = READ_U24(frame);
-                object_string* name = AS_STRING(
-                    frame->closure->function->chunk.constants.values[reconstructed_index]);
-                hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
-                virtual_machine_stack_pop();
-            } break;
-            case OP_DEFINE_GLOBAL_LONG_CONST: {
-                int reconstructed_index = READ_U24(frame);
-                object_string* name = AS_STRING(
-                    frame->closure->function->chunk.constants.values[reconstructed_index]);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
                 virtual_machine_stack_pop();
@@ -361,16 +333,6 @@ static interpret_result virtual_machine_run(void) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
 
-                if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
-                    hash_table_delete(&vm.global_variables, name);
-                    runtime_error("Undefined variable '%s'.", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
-                }
-            } break;
-            case OP_SET_GLOBAL_LONG: {
-                int reconstructed_index = READ_U24(frame);
-                object_string* name = AS_STRING(
-                    frame->closure->function->chunk.constants.values[reconstructed_index]);
                 if (hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0))) {
                     hash_table_delete(&vm.global_variables, name);
                     runtime_error("Undefined variable '%s'.", name->chars);

@@ -12,15 +12,10 @@ void disassemble_chunk(bytecode_chunk* chunk, const char* name) {
     }
 }
 
-static int constant_instruction(const char* name, bytecode_chunk* chunk, int offset,
-                                bool is_long_instr) {
+static int constant_instruction(const char* name, bytecode_chunk* chunk, int offset, bool wide) {
     int constant;
-    if (is_long_instr) {
-        if (offset + 3 >= chunk->count) {
-            printf("Truncated OP_CONSTANT_LONG at %d\n", offset);
-            exit(EXIT_FAILURE);
-        }
 
+    if (wide) {
         uint8_t hi = chunk->code[offset + 1];
         uint8_t mid = chunk->code[offset + 2];
         uint8_t lo = chunk->code[offset + 3];
@@ -28,10 +23,18 @@ static int constant_instruction(const char* name, bytecode_chunk* chunk, int off
     } else {
         constant = chunk->code[offset + 1];
     }
-    printf("%-24s %6d '", name, constant);
+
+    char instr[64];
+    if (wide) {
+        snprintf(instr, sizeof(instr), "%s[w]", name);
+    } else {
+        snprintf(instr, sizeof(instr), "%s", name);
+    }
+
+    printf("%-24s %6d '", instr, constant);
     print_value(chunk->constants.values[constant]);
     printf("'\n");
-    return is_long_instr ? offset + 4 : offset + 2;
+    return wide ? offset + 4 : offset + 2;
 }
 
 static int simple_instruction(const char* name, int offset) {
@@ -63,11 +66,15 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
     }
 
     uint8_t instruction = chunk->code[offset];
+    bool wide = false;
+    if (instruction == OP_WIDE) {
+        wide = true;
+        instruction = chunk->code[++offset];
+    }
+
     switch (instruction) {
         case OP_CONSTANT:
-            return constant_instruction("OP_CONSTANT", chunk, offset, false);
-        case OP_CONSTANT_LONG:
-            return constant_instruction("OP_CONSTANT_LONG", chunk, offset, true);
+            return constant_instruction("OP_CONSTANT", chunk, offset, wide);
         case OP_NULL:
             return simple_instruction("OP_NULL", offset);
         case OP_TRUE:
@@ -83,21 +90,13 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
         case OP_SET_LOCAL:
             return byte_instruction("OP_SET_LOCAL", chunk, offset);
         case OP_GET_GLOBAL:
-            return constant_instruction("OP_GET_GLOBAL", chunk, offset, false);
-        case OP_GET_GLOBAL_LONG:
-            return constant_instruction("OP_GET_GLOBAL", chunk, offset, true);
+            return constant_instruction("OP_GET_GLOBAL", chunk, offset, wide);
         case OP_DEFINE_GLOBAL:
-            return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset, false);
+            return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset, wide);
         case OP_DEFINE_GLOBAL_CONST:
-            return constant_instruction("OP_DEFINE_GLOBAL_CONST", chunk, offset, false);
-        case OP_DEFINE_GLOBAL_LONG:
-            return constant_instruction("OP_DEFINE_GLOBAL_LONG", chunk, offset, true);
-        case OP_DEFINE_GLOBAL_LONG_CONST:
-            return constant_instruction("OP_DEFINE_GLOBAL_LONG_CONST", chunk, offset, true);
+            return constant_instruction("OP_DEFINE_GLOBAL_CONST", chunk, offset, wide);
         case OP_SET_GLOBAL:
-            return constant_instruction("OP_SET_GLOBAL", chunk, offset, false);
-        case OP_SET_GLOBAL_LONG:
-            return constant_instruction("OP_SET_GLOBAL", chunk, offset, false);
+            return constant_instruction("OP_SET_GLOBAL", chunk, offset, wide);
         case OP_EQUAL:
             return simple_instruction("OP_EQUAL", offset);
         case OP_GREATER:
