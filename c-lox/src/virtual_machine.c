@@ -240,13 +240,21 @@ static int READ_U24(call_frame* frame) {
     return deconstruct_u24_t(u24_index);
 }
 
+static clox_value READ_CONSTANT(call_frame* frame, bool wide) {
+    if (wide) {
+        int index = READ_U24(frame);
+        return frame->closure->function->chunk.constants.values[index];
+    } else {
+        return frame->closure->function->chunk.constants.values[*frame->ip++];
+    }
+}
+
 static interpret_result virtual_machine_run(void) {
     call_frame* frame = &vm.frames[vm.frame_count - 1];
 
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
-#define READ_STRING() AS_STRING(READ_CONSTANT())
+#define READ_STRING(wide) AS_STRING(READ_CONSTANT(frame, wide))
 #define BINARY_OP(value_type, op)                                                                  \
     do {                                                                                           \
         if (!IS_NUMBER(virtual_machine_stack_peek(0)) ||                                           \
@@ -272,14 +280,16 @@ static interpret_result virtual_machine_run(void) {
                                 (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
 
-        uint8_t instruction;
+        bool wide_pending = false;
+        uint8_t instruction = READ_BYTE();
+        if (instruction == OP_WIDE) {
+            wide_pending = true;
+            instruction = READ_BYTE();
+        }
 
-        switch (instruction = READ_BYTE()) {
-            case OP_WIDE: {
-                printf("ITS RAWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW\n");
-            } break;
+        switch (instruction) {
             case OP_CONSTANT: {
-                clox_value constant = READ_CONSTANT();
+                clox_value constant = READ_CONSTANT(frame, wide_pending);
                 virtual_machine_stack_push(constant);
             } break;
             case OP_NULL: {
@@ -306,7 +316,7 @@ static interpret_result virtual_machine_run(void) {
                 frame->slots[slot] = virtual_machine_stack_peek(0);
             } break;
             case OP_GET_GLOBAL: {
-                object_string* name = READ_STRING();
+                object_string* name = READ_STRING(wide_pending);
                 clox_value val;
                 if (!hash_table_get(&vm.global_variables, name, &val)) {
                     runtime_error("Undefined variable '%s'.", name->chars);
@@ -315,18 +325,18 @@ static interpret_result virtual_machine_run(void) {
                 virtual_machine_stack_push(val);
             } break;
             case OP_DEFINE_GLOBAL: {
-                object_string* name = READ_STRING();
+                object_string* name = READ_STRING(wide_pending);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_CONST: {
-                object_string* name = READ_STRING();
+                object_string* name = READ_STRING(wide_pending);
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
                 virtual_machine_stack_pop();
             } break;
             case OP_SET_GLOBAL: {
-                object_string* name = READ_STRING();
+                object_string* name = READ_STRING(wide_pending);
 
                 if (hash_table_get(&vm.global_consts, name, &(clox_value){0})) {
                     runtime_error("Cannot reassign to a global variable marked 'const'.");
@@ -403,7 +413,7 @@ static interpret_result virtual_machine_run(void) {
                 frame = &vm.frames[vm.frame_count - 1];
             } break;
             case OP_CLOSURE: {
-                object_function* function = AS_FUNCTION(READ_CONSTANT());
+                object_function* function = AS_FUNCTION(READ_CONSTANT(frame, wide_pending));
                 object_closure* closure = new_closure(function);
                 virtual_machine_stack_push(OBJECT_VALUE(closure));
             } break;
@@ -432,7 +442,6 @@ static interpret_result virtual_machine_run(void) {
 
 #undef READ_BYTE
 #undef READ_SHORT
-#undef READ_CONSTANT
 #undef READ_STRING
 #undef BINARY_OP
 }
