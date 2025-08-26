@@ -17,7 +17,13 @@
 
 #define AS_CSTRING(val) (((object_string*)AS_OBJECT(val))->chars)
 
-typedef enum { OBJECT_CLOSURE, OBJECT_FUNCTION, OBJECT_NATIVE, OBJECT_STRING } object_type;
+typedef enum {
+    OBJECT_CLOSURE,
+    OBJECT_FUNCTION,
+    OBJECT_NATIVE,
+    OBJECT_STRING,
+    OBJECT_UPVALUE
+} object_type;
 
 struct object {
     object_type type;
@@ -27,6 +33,7 @@ struct object {
 typedef struct {
     object obj;
     int arity;
+    int upvalue_count;
     bytecode_chunk chunk;
     object_string* name;
 } object_function;
@@ -48,9 +55,16 @@ struct object_string {
     uint32_t hash;
 };
 
+typedef struct object_upvalue {
+    object obj;
+    clox_value* location;
+} object_upvalue;
+
 typedef struct {
     object obj;
     object_function* function;
+    object_upvalue** upvalues;
+    int upvalue_count;
 } object_closure;
 
 object_closure* new_closure(object_function* function);
@@ -58,6 +72,7 @@ object_function* new_function(void);
 object_native* new_native(native_fn function, const char* name, int min_arity, int max_arity);
 object_string* take_string(char* chars, int length);
 object_string* copy_string(const char* chars, int length);
+object_upvalue* new_upvalue(clox_value* slot);
 void print_function(object_function* val);
 void print_object(clox_value val);
 void print_string(object_string* str);

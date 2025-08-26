@@ -39,6 +39,11 @@ static void free_object(object* obj) {
             FREE_ARRAY(char, string->chars, string->length);
             FREE(object_string, obj);
         } break;
+        case OBJECT_UPVALUE: {
+            object_closure* closure = (object_closure*)obj;
+            FREE_ARRAY(object_upvalue*, closure->upvalues, closure->upvalue_count);
+            FREE(object_upvalue, obj);
+        } break;
     }
 }
 

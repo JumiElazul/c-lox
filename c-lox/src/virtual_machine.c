@@ -186,6 +186,11 @@ static bool call_value(clox_value callee, int arg_count) {
     return false;
 }
 
+static object_upvalue* capture_upvalue(clox_value* local) {
+    object_upvalue* created_upvalue = new_upvalue(local);
+    return created_upvalue;
+}
+
 static bool is_falsey(clox_value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
@@ -357,6 +362,14 @@ static interpret_result virtual_machine_run(void) {
                     return INTERPRET_RUNTIME_ERROR;
                 }
             } break;
+            case OP_GET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                virtual_machine_stack_push(*frame->closure->upvalues[slot]->location);
+            } break;
+            case OP_SET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                *frame->closure->upvalues[slot]->location = virtual_machine_stack_peek(0);
+            } break;
             case OP_EQUAL: {
                 clox_value b = virtual_machine_stack_pop();
                 clox_value a = virtual_machine_stack_pop();
@@ -424,6 +437,16 @@ static interpret_result virtual_machine_run(void) {
                 object_function* function = AS_FUNCTION(READ_CONSTANT(frame, wide_pending));
                 object_closure* closure = new_closure(function);
                 virtual_machine_stack_push(OBJECT_VALUE(closure));
+
+                for (int i = 0; i < closure->upvalue_count; ++i) {
+                    uint8_t is_local = READ_BYTE();
+                    uint8_t index = READ_BYTE();
+                    if (is_local) {
+                        closure->upvalues[i] = capture_upvalue(frame->slots + index);
+                    } else {
+                        closure->upvalues[i] = frame->closure->upvalues[index];
+                    }
+                }
             } break;
             case OP_RETURN: {
                 clox_value result = virtual_machine_stack_pop();

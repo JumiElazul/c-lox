@@ -108,6 +108,11 @@ typedef struct {
     bool is_const;
 } local_variable;
 
+typedef struct {
+    uint8_t index;
+    bool is_local;
+} upvalue;
+
 typedef enum {
     TYPE_FUNCTION,
     TYPE_SCRIPT,
@@ -120,6 +125,7 @@ typedef struct compiler {
 
     local_variable locals[UINT8_COUNT];
     int local_count;
+    upvalue upvalues[UINT8_COUNT];
     int scope_depth;
 } compiler;
 
@@ -134,6 +140,7 @@ static void statement(void);
 static void declaration_statement(void);
 static int identifier_constant(token* name);
 static int resolve_local(compiler* comp, token* name);
+static int resolve_upvalue(compiler* comp, token* name);
 static void and_(bool can_assign);
 static void or_(bool can_assign);
 static void variable_declaration(bool is_const);
@@ -427,6 +434,11 @@ static void named_variable(token name, bool can_assign) {
         return;
     }
     // Upvalue path
+    int upvalue = resolve_upvalue(current_compiler, &name);
+    if (upvalue != -1) {
+        emit_bytes2(is_set ? OP_SET_UPVALUE : OP_GET_UPVALUE, (uint8_t)upvalue);
+        return;
+    }
 
     // Global path
     int global_index = identifier_constant(&name);
@@ -566,6 +578,44 @@ static int resolve_local(compiler* comp, token* name) {
 
             return i;
         }
+    }
+
+    return -1;
+}
+
+static int add_upvalue(compiler* comp, uint8_t index, bool is_local) {
+    int upvalue_count = comp->function->upvalue_count;
+
+    for (int i = 0; i < upvalue_count; ++i) {
+        upvalue* upval = &comp->upvalues[i];
+        if (upval->index == index && upval->is_local == is_local) {
+            return i;
+        }
+    }
+
+    if (upvalue_count == UINT8_COUNT) {
+        error("Too many closure variables in function.");
+        return 0;
+    }
+
+    comp->upvalues[upvalue_count].is_local = is_local;
+    comp->upvalues[upvalue_count].index = index;
+    return comp->function->upvalue_count++;
+}
+
+static int resolve_upvalue(compiler* comp, token* name) {
+    if (comp->enclosing_compiler == NULL) {
+        return -1;
+    }
+
+    int local = resolve_local(comp->enclosing_compiler, name);
+    if (local != -1) {
+        return add_upvalue(comp, (uint8_t)local, true);
+    }
+
+    int upvalue = resolve_upvalue(comp->enclosing_compiler, name);
+    if (upvalue != -1) {
+        return add_upvalue(comp, (uint8_t)upvalue, false);
     }
 
     return -1;
@@ -767,7 +817,12 @@ static void compile_function(function_type type) {
     block_statement();
 
     object_function* function = end_compilation();
-    emit_constant(OBJECT_VALUE(function));
+    emit_bytes2(OP_CLOSURE, make_constant(OBJECT_VALUE(function)));
+
+    for (int i = 0; i < function->upvalue_count; ++i) {
+        emit_byte(comp.upvalues[i].is_local ? 1 : 0);
+        emit_byte(comp.upvalues[i].index);
+    }
 }
 
 static void function_declaration(void) {

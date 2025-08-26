@@ -1,5 +1,6 @@
 #include "disassembler.h"
 #include "bytecode_chunk.h"
+#include "clox_object.h"
 #include "clox_value.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,6 +98,10 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
             return constant_instruction("OP_DEFINE_GLOBAL_CONST", chunk, offset, wide);
         case OP_SET_GLOBAL:
             return constant_instruction("OP_SET_GLOBAL", chunk, offset, wide);
+        case OP_GET_UPVALUE:
+            return byte_instruction("OP_GET_UPVALUE", chunk, offset);
+        case OP_SET_UPVALUE:
+            return byte_instruction("OP_SET_UPVALUE", chunk, offset);
         case OP_EQUAL:
             return simple_instruction("OP_EQUAL", offset);
         case OP_GREATER:
@@ -130,6 +135,15 @@ int disassemble_instruction(bytecode_chunk* chunk, int offset) {
             printf("%-24s %6d ", "OP_CLOSURE", constant);
             print_value(chunk->constants.values[constant]);
             printf("\n");
+
+            object_function* function = AS_FUNCTION(chunk->constants.values[constant]);
+            for (int j = 0; j < function->upvalue_count; ++j) {
+                int is_local = chunk->code[offset++];
+                int index = chunk->code[offset++];
+                printf("%06d     |            %s %d\n", offset - 2, is_local ? "local" : "upvalue",
+                       index);
+            }
+
             return offset;
         case OP_RETURN:
             return simple_instruction("OP_RETURN", offset);
