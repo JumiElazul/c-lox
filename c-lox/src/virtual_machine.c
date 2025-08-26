@@ -326,11 +326,19 @@ static interpret_result virtual_machine_run(void) {
             } break;
             case OP_DEFINE_GLOBAL: {
                 object_string* name = READ_STRING(wide_pending);
+                if (hash_table_get(&vm.global_variables, name, &(clox_value){0})) {
+                    runtime_error("Global variable '%s' already defined.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 virtual_machine_stack_pop();
             } break;
             case OP_DEFINE_GLOBAL_CONST: {
                 object_string* name = READ_STRING(wide_pending);
+                if (hash_table_get(&vm.global_variables, name, &(clox_value){0})) {
+                    runtime_error("Global variable '%s' already defined.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
                 hash_table_set(&vm.global_variables, name, virtual_machine_stack_peek(0));
                 hash_table_set(&vm.global_consts, name, BOOL_VALUE(true));
                 virtual_machine_stack_pop();
