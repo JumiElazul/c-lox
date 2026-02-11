@@ -1,8 +1,0 @@
-var filepath = "input.txt";
-
-if (file_exists(filepath)) {
-    var contents = read_file(filepath);
-    println(contents);
-} else {
-    println("Filepath doesn't exist!", filepath);
-}
