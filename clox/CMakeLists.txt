@@ -10,6 +10,8 @@ set(SOURCES
     "src/debug.c"
     "src/memory.h"
     "src/memory.c"
+    "src/vm.h"
+    "src/vm.c"
 )
 
 add_executable(clox ${SOURCES})

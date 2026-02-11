@@ -1,8 +1,11 @@
 #include "bytecode_chunk.h"
 #include "common.h"
 #include "debug.h"
+#include "vm.h"
 
 int main(int argc, char* argv[]) {
+    init_vm();
+
     bytecode_chunk chunk;
     init_bytecode_chunk(&chunk);
 
@@ -16,6 +19,9 @@ int main(int argc, char* argv[]) {
 
     disassemble_chunk(&chunk, "test chunk");
 
+    interpret(&chunk);
+
+    free_vm();
     free_bytecode_chunk(&chunk);
     return 0;
 }

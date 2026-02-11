@@ -1,0 +1,26 @@
+#ifndef CLOX_VM_H
+#define CLOX_VM_H
+#include "bytecode_chunk.h"
+
+#define STACK_MAX 256
+
+typedef struct {
+    bytecode_chunk* chunk;
+    uint8_t* ip;
+    clox_value stack[STACK_MAX];
+    clox_value* sp;
+} VM;
+
+typedef enum {
+    INTERPRET_OK,
+    INTERPRET_COMPILE_ERROR,
+    INTERPRET_RUNTIME_ERROR,
+} interpret_result;
+
+void init_vm();
+void free_vm();
+interpret_result interpret(bytecode_chunk* chunk);
+void vm_stack_push(clox_value);
+clox_value vm_stack_pop();
+
+#endif
