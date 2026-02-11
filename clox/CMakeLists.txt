@@ -4,6 +4,12 @@ set(SOURCES
 
     "src/bytecode_chunk.h"
     "src/bytecode_chunk.c"
+    "src/clox_value.h"
+    "src/clox_value.c"
+    "src/debug.h"
+    "src/debug.c"
+    "src/memory.h"
+    "src/memory.c"
 )
 
 add_executable(clox ${SOURCES})
