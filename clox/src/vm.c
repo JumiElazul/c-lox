@@ -1,5 +1,6 @@
 #include "vm.h"
 #include "assert.h"
+#include "bytecode_chunk.h"
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
@@ -74,8 +75,21 @@ static interpret_result run() {
 }
 
 interpret_result interpret(const char* source) {
-    compile(source);
-    return INTERPRET_OK;
+    bytecode_chunk chunk;
+    init_bytecode_chunk(&chunk);
+
+    if (!compile(source, &chunk)) {
+        free_bytecode_chunk(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    vm.chunk = &chunk;
+    vm.ip = vm.chunk->code;
+
+    interpret_result result = run();
+
+    free_bytecode_chunk(&chunk);
+    return result;
 }
 
 void vm_stack_push(clox_value value) {
