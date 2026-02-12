@@ -19,7 +19,7 @@ typedef enum {
 
 void init_vm();
 void free_vm();
-interpret_result interpret(bytecode_chunk* chunk);
+interpret_result interpret(const char* source);
 void vm_stack_push(clox_value);
 clox_value vm_stack_pop();
 

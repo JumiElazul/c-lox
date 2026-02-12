@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "assert.h"
 #include "common.h"
+#include "compiler.h"
 #include "debug.h"
 #include <stdio.h>
 
@@ -72,10 +73,9 @@ static interpret_result run() {
 #undef BINARY_OP
 }
 
-interpret_result interpret(bytecode_chunk* chunk) {
-    vm.chunk = chunk;
-    vm.ip = vm.chunk->code;
-    return run();
+interpret_result interpret(const char* source) {
+    compile(source);
+    return INTERPRET_OK;
 }
 
 void vm_stack_push(clox_value value) {
