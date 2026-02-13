@@ -3,6 +3,11 @@
 #include "common.h"
 #include "lexer.h"
 #include <stdio.h>
+#include <stdlib.h>
+
+#ifdef DEBUG_PRINT_CODE
+#include "debug.h"
+#endif
 
 typedef struct {
     token current;
@@ -11,8 +16,34 @@ typedef struct {
     bool panic_mode;
 } parser;
 
+typedef enum {
+    PREC_NONE,
+    PREC_ASSIGNMENT,
+    PREC_OR,
+    PREC_AND,
+    PREC_EQUALITY,
+    PREC_COMPARISON,
+    PREC_TERM,
+    PREC_FACTOR,
+    PREC_UNARY,
+    PREC_CALL,
+    PREC_PRIMARY,
+} precedence;
+
+typedef void (*parse_fn)();
+
+typedef struct {
+    parse_fn prefix;
+    parse_fn infix;
+    precedence prec;
+} parse_rule;
+
 parser parse;
 bytecode_chunk* compiling_chunk;
+
+static void parse_expression();
+static parse_rule* get_rule(token_type type);
+static void parse_precedence(precedence prec);
 
 static bytecode_chunk* current_chunk() {
     return compiling_chunk;
@@ -81,8 +112,150 @@ static void emit_return() {
     emit_byte(OP_RETURN);
 }
 
+static uint8_t make_constant(clox_value value) {
+    int constant = add_constant(current_chunk(), value);
+    if (constant > UINT8_MAX) {
+        error("Too many constants in one chunk.");
+        return 0;
+    }
+    return (uint8_t)constant;
+}
+
+static void emit_constant(clox_value value) {
+    emit_bytes2(OP_CONSTANT, make_constant(value));
+}
+
 static void end_compiler() {
     emit_return();
+#ifdef DEBUG_PRINT_CODE
+    if (!parse.had_error) {
+        disassemble_chunk(current_chunk(), "code");
+    }
+#endif
+}
+
+static void binary() {
+    token_type operator_type = parse.previous.type;
+    parse_rule* rule = get_rule(operator_type);
+    parse_precedence((precedence)(rule->prec + 1));
+
+    switch (operator_type) {
+        case TOKEN_PLUS:
+            emit_byte(OP_ADD);
+            break;
+        case TOKEN_MINUS:
+            emit_byte(OP_SUBTRACT);
+            break;
+        case TOKEN_STAR:
+            emit_byte(OP_MULTIPLY);
+            break;
+        case TOKEN_SLASH:
+            emit_byte(OP_DIVIDE);
+            break;
+        default:
+            return;
+    }
+}
+
+static void grouping() {
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
+}
+
+static void number() {
+    double value = strtod(parse.previous.start, NULL);
+    emit_constant(value);
+}
+
+static void unary() {
+    token_type operator_type = parse.previous.type;
+
+    parse_precedence(PREC_UNARY);
+
+    switch (operator_type) {
+        case TOKEN_MINUS:
+            emit_byte(OP_NEGATE);
+        case TOKEN_BANG:
+            return;
+        default:
+            return;
+    }
+}
+
+// clang-format off
+parse_rule rules[] = {
+    [TOKEN_LEFT_PAREN]    = {grouping, NULL,    PREC_NONE  },
+    [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_LEFT_BRACE]    = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_COMMA]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_DOT]           = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_MINUS]         = {unary,    binary,  PREC_TERM  },
+    [TOKEN_PLUS]          = {NULL,     binary,  PREC_TERM  },
+    [TOKEN_SEMICOLON]     = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_SLASH]         = {NULL,     binary,  PREC_FACTOR},
+    [TOKEN_STAR]          = {NULL,     binary,  PREC_FACTOR},
+    [TOKEN_BANG]          = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_BANG_EQUAL]    = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_EQUAL]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_GREATER]       = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_GREATER_EQUAL] = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_LESS]          = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_LESS_EQUAL]    = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_IDENTIFIER]    = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_STRING]        = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_NUMBER]        = {number,   NULL,    PREC_NONE  },
+    [TOKEN_AND]           = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_CLASS]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_ELSE]          = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_FALSE]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_FOR]           = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_FUN]           = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_IF]            = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_NIL]           = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_OR]            = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_PRINT]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_RETURN]        = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_SUPER]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_THIS]          = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_TRUE]          = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_VAR]           = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_WHILE]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_ERROR]         = {NULL,     NULL,    PREC_NONE  },
+    [TOKEN_EOF]           = {NULL,     NULL,    PREC_NONE  },
+};
+// clang-format on
+
+static void parse_precedence(precedence prec) {
+    advance_parser();
+
+    parse_fn prefix_rule = get_rule(parse.previous.type)->prefix;
+    if (!prefix_rule) {
+        error("Expected expression.");
+        return;
+    }
+
+    prefix_rule();
+
+    while (prec <= get_rule(parse.current.type)->prec) {
+        advance_parser();
+        parse_fn infix_rule = get_rule(parse.previous.type)->infix;
+        if (!infix_rule) {
+            error("Expected valid infix rule.");
+            return;
+        }
+        infix_rule();
+    }
+}
+
+static parse_rule* get_rule(token_type type) {
+    return &rules[type];
+}
+
+static void parse_expression() {
+    parse_precedence(PREC_ASSIGNMENT);
+    consume_if_matches(TOKEN_SEMICOLON, "Expected semicolon ';' after expression.");
 }
 
 bool compile(const char* source, bytecode_chunk* chunk) {
@@ -93,7 +266,7 @@ bool compile(const char* source, bytecode_chunk* chunk) {
     parse.panic_mode = false;
 
     advance_parser();
-    expression();
+    parse_expression();
     consume_if_matches(TOKEN_EOF, "Expect end of expression.");
     end_compiler();
     return !parse.had_error;

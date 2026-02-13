@@ -4,6 +4,7 @@
 #include "vm.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void repl(void) {
     char line[1024];
@@ -12,6 +13,10 @@ static void repl(void) {
 
         if (!fgets(line, sizeof(line), stdin)) {
             printf("\n");
+            break;
+        }
+
+        if ((memcmp(line, "quit", 4) == 0) || (memcmp(line, "q", 1) == 0)) {
             break;
         }
 

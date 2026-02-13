@@ -14,8 +14,8 @@ typedef enum {
 } opcode;
 
 typedef struct {
-    int count;
-    int capacity;
+    size_t count;
+    size_t capacity;
     uint8_t* code;
     int* lines;
     value_array constants;

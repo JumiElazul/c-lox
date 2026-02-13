@@ -20,7 +20,7 @@ void free_bytecode_chunk(bytecode_chunk* chunk) {
 
 void write_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
     if (chunk->count >= chunk->capacity) {
-        int old_capacity = chunk->capacity;
+        size_t old_capacity = chunk->capacity;
         chunk->capacity = GROW_CAPACITY(old_capacity);
         chunk->code = GROW_ARRAY(uint8_t, chunk->code, old_capacity, chunk->capacity);
         chunk->lines = GROW_ARRAY(int, chunk->lines, old_capacity, chunk->capacity);
