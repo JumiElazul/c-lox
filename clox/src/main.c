@@ -16,7 +16,7 @@ static void repl(void) {
             break;
         }
 
-        if ((memcmp(line, "quit", 4) == 0) || (memcmp(line, "q", 1) == 0)) {
+        if (line[0] == '\n' || memcmp(line, "quit", 4) == 0) {
             break;
         }
 

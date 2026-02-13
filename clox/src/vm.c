@@ -4,12 +4,34 @@
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include <stdarg.h>
 #include <stdio.h>
 
 VM vm;
 
+static clox_value peek_stack(int distance) {
+    return vm.sp[-1 - distance];
+}
+
+static bool is_falsey(clox_value value) {
+    return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
 static void vm_reset_stack() {
     vm.sp = vm.stack;
+}
+
+static void runtime_error(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fputs("\n", stderr);
+
+    size_t instruction = (size_t)(vm.ip - vm.chunk->code - 1);
+    int line = vm.chunk->lines[instruction];
+    fprintf(stderr, "[line %d] in script\n", line);
+    vm_reset_stack();
 }
 
 void init_vm() {
@@ -22,23 +44,27 @@ void free_vm() {
 static interpret_result run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
-#define BINARY_OP(op) \
+#define BINARY_OP(value_type, op) \
     do { \
-        double b = vm_stack_pop();\
-        double a = vm_stack_pop();\
-        vm_stack_push(a op b);\
+        if (!IS_NUMBER(peek_stack(0)) || !IS_NUMBER(peek_stack(1))) { \
+            runtime_error("Operands must be numbers."); \
+            return INTERPRET_RUNTIME_ERROR; \
+        } \
+        double b = AS_NUMBER(vm_stack_pop());\
+        double a = AS_NUMBER(vm_stack_pop());\
+        vm_stack_push(value_type(a op b));\
     } while (false);
 
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
         printf("        ");
         for (clox_value* slot = vm.stack; slot < vm.sp; ++slot) {
-            printf("[ ");
+            printf("[");
             print_value(*slot);
             printf("]");
         }
         printf("\n");
-        disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+        disassemble_instruction(vm.chunk, (size_t)(vm.ip - vm.chunk->code));
 #endif
         uint8_t instruction;
         switch (instruction = READ_BYTE()) {
@@ -46,20 +72,47 @@ static interpret_result run() {
                 clox_value constant = READ_CONSTANT();
                 vm_stack_push(constant);
             } break;
+            case OP_NULL: {
+                vm_stack_push(NULL_VAL());
+            } break;
+            case OP_TRUE: {
+                vm_stack_push(BOOL_VAL(true));
+            } break;
+            case OP_FALSE: {
+                vm_stack_push(BOOL_VAL(false));
+            } break;
+            case OP_EQUAL: {
+                clox_value b = vm_stack_pop();
+                clox_value a = vm_stack_pop();
+                vm_stack_push(BOOL_VAL(values_equal(a, b)));
+            } break;
             case OP_NEGATE: {
-                vm_stack_push(-vm_stack_pop());
+                if (!IS_NUMBER(peek_stack(0))) {
+                    runtime_error("Operand must be a number.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                vm_stack_push(NUMBER_VAL(-AS_NUMBER(vm_stack_pop())));
+            } break;
+            case OP_GREATER: {
+                BINARY_OP(BOOL_VAL, >);
+            } break;
+            case OP_LESS: {
+                BINARY_OP(BOOL_VAL, <);
             } break;
             case OP_ADD: {
-                BINARY_OP(+);
+                BINARY_OP(NUMBER_VAL, +);
             } break;
             case OP_SUBTRACT: {
-                BINARY_OP(-);
+                BINARY_OP(NUMBER_VAL, -);
             } break;
             case OP_MULTIPLY: {
-                BINARY_OP(*);
+                BINARY_OP(NUMBER_VAL, *);
             } break;
             case OP_DIVIDE: {
-                BINARY_OP(/);
+                BINARY_OP(NUMBER_VAL, /);
+            } break;
+            case OP_NOT: {
+                vm_stack_push(BOOL_VAL(is_falsey(vm_stack_pop())));
             } break;
             case OP_RETURN: {
                 print_value(vm_stack_pop());

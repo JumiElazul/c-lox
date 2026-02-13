@@ -30,6 +30,7 @@ target_compile_options(clox PRIVATE
     -Wshadow
     -Wconversion
     -Wno-switch-enum
+    -Wno-switch
     -fsigned-char
 
     $<$<CONFIG:Debug>:-fsanitize=address;-fsanitize=undefined>

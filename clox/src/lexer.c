@@ -131,7 +131,11 @@ static token_type identifier_type() {
         case 'i':
             return check_keyword(1, 1, "f", TOKEN_IF);
         case 'n':
-            return check_keyword(1, 2, "il", TOKEN_NIL);
+            if (lex.current - lex.start > 1) {
+                if (lex.start[1] == 'u') {
+                    return check_keyword(2, 2, "ll", TOKEN_NULL);
+                }
+            }
         case 'o':
             return check_keyword(1, 1, "r", TOKEN_OR);
         case 'p':

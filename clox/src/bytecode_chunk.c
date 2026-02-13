@@ -33,5 +33,5 @@ void write_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
 
 int add_constant(bytecode_chunk* chunk, clox_value value) {
     write_value_array(&chunk->constants, value);
-    return chunk->constants.count - 1;
+    return (int)chunk->constants.count - 1;
 }
