@@ -4,8 +4,11 @@
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include "memory.h"
+#include "object.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 VM vm;
 
@@ -15,6 +18,20 @@ static clox_value peek_stack(int distance) {
 
 static bool is_falsey(clox_value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
+static void concatenate() {
+    object_string* b = AS_STRING(vm_stack_pop());
+    object_string* a = AS_STRING(vm_stack_pop());
+
+    size_t length = a->length + b->length;
+    char* chars = ALLOCATE(char, length + 1);
+    memcpy(chars, a->chars, a->length);
+    memcpy(chars + a->length, b->chars, b->length);
+    chars[length] = '\0';
+
+    object_string* result = take_string(chars, length);
+    vm_stack_push(OBJECT_VAL(result));
 }
 
 static void vm_reset_stack() {
@@ -36,6 +53,7 @@ static void runtime_error(const char* format, ...) {
 
 void init_vm() {
     vm_reset_stack();
+    vm.objects = NULL;
 }
 
 void free_vm() {
@@ -100,7 +118,16 @@ static interpret_result run() {
                 BINARY_OP(BOOL_VAL, <);
             } break;
             case OP_ADD: {
-                BINARY_OP(NUMBER_VAL, +);
+                if (IS_STRING(peek_stack(0)) && IS_STRING(peek_stack(1))) {
+                    concatenate();
+                } else if (IS_NUMBER(peek_stack(0)) && IS_NUMBER(peek_stack(1))) {
+                    double b = AS_NUMBER(vm_stack_pop());
+                    double a = AS_NUMBER(vm_stack_pop());
+                    vm_stack_push(NUMBER_VAL(a + b));
+                } else {
+                    runtime_error("Operands must be two numbers or two strings.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
             } break;
             case OP_SUBTRACT: {
                 BINARY_OP(NUMBER_VAL, -);

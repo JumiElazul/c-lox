@@ -2,6 +2,7 @@
 #define CLOX_LEXER_H
 
 // clang-format off
+#include "common.h"
 typedef enum {
     // Single-character tokens.
     TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,
@@ -27,7 +28,7 @@ typedef enum {
 typedef struct {
     token_type type;
     const char* start;
-    int length;
+    size_t length;
     int line;
 } token;
 

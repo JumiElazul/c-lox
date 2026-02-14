@@ -1,6 +1,8 @@
 #include "clox_value.h"
 #include "memory.h"
+#include "object.h"
 #include "stdio.h"
+#include <string.h>
 
 bool values_equal(clox_value a, clox_value b) {
     if (a.type != b.type) {
@@ -17,6 +19,12 @@ bool values_equal(clox_value a, clox_value b) {
         case VAL_NUMBER: {
             return AS_NUMBER(a) == AS_NUMBER(b);
         }
+        case VAL_OBJECT: {
+            object_string* a_string = AS_STRING(a);
+            object_string* b_string = AS_STRING(b);
+            return a_string->length == b_string->length &&
+                   memcmp(a_string->chars, b_string->chars, a_string->length) == 0;
+        } break;
         default:
             return false;
     }
@@ -35,7 +43,7 @@ void free_value_array(value_array* array) {
 
 void write_value_array(value_array* array, clox_value value) {
     if (array->count >= array->capacity) {
-        int old_capacity = array->capacity;
+        size_t old_capacity = array->capacity;
         array->capacity = GROW_CAPACITY(old_capacity);
         array->values = GROW_ARRAY(clox_value, array->values, old_capacity, array->capacity);
     }
@@ -54,6 +62,9 @@ void print_value(clox_value value) {
         } break;
         case VAL_NUMBER: {
             printf("%g", AS_NUMBER(value));
+        } break;
+        case VAL_OBJECT: {
+            print_object(value);
         } break;
     }
 }

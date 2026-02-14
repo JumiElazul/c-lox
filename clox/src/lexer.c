@@ -191,8 +191,8 @@ static token string() {
     while (peek_char() != '"' && !is_at_end()) {
         if (peek_char() == '\n') {
             ++lex.line;
-            advance_lexer();
         }
+        advance_lexer();
     }
 
     if (is_at_end()) {
