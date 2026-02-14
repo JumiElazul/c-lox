@@ -31,7 +31,7 @@ typedef struct {
 #define AS_OBJECT(val)  ((val).as.obj)
 
 #define BOOL_VAL(val)   ((clox_value){VAL_BOOL,   {.boolean = val}})
-#define NULL_VAL(val)   ((clox_value){VAL_NULL,   {.number = 0}})
+#define NULL_VAL        ((clox_value){VAL_NULL,   {.number = 0}})
 #define NUMBER_VAL(val) ((clox_value){VAL_NUMBER, {.number = val}})
 #define OBJECT_VAL(val) ((clox_value){VAL_OBJECT, {.obj = (object*)val}})
 

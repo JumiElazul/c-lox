@@ -22,6 +22,7 @@ typedef struct object_string {
     object obj;
     size_t length;
     char* chars;
+    uint32_t hash;
 } object_string;
 
 object_string* take_string(char* chars, size_t length);
