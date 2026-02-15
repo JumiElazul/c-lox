@@ -1,4 +1,5 @@
 #include "object.h"
+#include "hash_table.h"
 #include "memory.h"
 #include "vm.h"
 #include <stdio.h>
@@ -20,6 +21,10 @@ static object_string* allocate_string(char* chars, size_t length, uint32_t hash)
     string->length = length;
     string->chars = chars;
     string->hash = hash;
+
+    // Intern the string
+    hash_table_set(&vm.strings, string, NULL_VAL);
+
     return string;
 }
 
@@ -39,6 +44,7 @@ object_string* take_string(char* chars, size_t length) {
 
 object_string* copy_string(const char* chars, size_t length) {
     uint32_t hash = fnv1a_hash_string(chars, length);
+
     char* heap_chars = ALLOCATE(char, (size_t)length + 1);
     memcpy(heap_chars, chars, (size_t)length);
     heap_chars[length] = '\0';

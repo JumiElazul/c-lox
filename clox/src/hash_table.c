@@ -16,12 +16,21 @@ void free_hash_table(hash_table* table) {
     init_hash_table(table);
 }
 
-static table_entry* find_entry(hash_table* table, size_t capacity, object_string* key) {
+static table_entry* find_entry(table_entry* entries, size_t capacity, object_string* key) {
     uint32_t index = key->hash % capacity;
+    table_entry* tombstone = NULL;
 
     for (;;) {
-        table_entry* entry = &table->entries[index];
-        if (entry->key == key || entry->key == NULL) {
+        table_entry* entry = &entries[index];
+        if (entry->key == NULL) {
+            if (IS_NULL(entry->value)) {
+                return tombstone != NULL ? tombstone : entry;
+            } else {
+                if (tombstone == NULL) {
+                    tombstone = entry;
+                }
+            }
+        } else if (entry->key == key) {
             return entry;
         }
 
@@ -30,21 +39,83 @@ static table_entry* find_entry(hash_table* table, size_t capacity, object_string
 }
 
 static void adjust_capacity(hash_table* table, size_t capacity) {
+    table_entry* entries = ALLOCATE(table_entry, capacity);
+    for (size_t i = 0; i < capacity; ++i) {
+        table_entry* entry = &entries[i];
+        entry->key = NULL;
+        entry->value = NULL_VAL;
+    }
+
+    table->count = 0;
+    for (size_t i = 0; i < table->capacity; ++i) {
+        table_entry* entry = &table->entries[i];
+        if (entry->key == NULL) {
+            continue;
+        }
+
+        table_entry* dest = find_entry(entries, capacity, entry->key);
+        dest->key = entry->key;
+        dest->value = entry->value;
+        table->count++;
+    }
+
+    FREE_ARRAY(table_entry, table->entries, table->capacity);
+    table->entries = entries;
+    table->capacity = capacity;
 }
 
-void hash_table_set(hash_table* table, object_string* key, clox_value value) {
+bool hash_table_get(hash_table* table, object_string* key, clox_value* value) {
+    if (table->count == 0) {
+        return false;
+    }
+
+    table_entry* entry = find_entry(table->entries, table->capacity, key);
+    if (entry->key == NULL) {
+        return false;
+    }
+
+    *value = entry->value;
+    return true;
+}
+
+bool hash_table_set(hash_table* table, object_string* key, clox_value value) {
     if (table->count >= table->capacity * TABLE_MAX_LOAD) {
-        size_t capacity = GROW_CAPACITY(table->capacity);
-        adjust_capacity(table, capacity);
+        size_t new_capacity = GROW_CAPACITY(table->capacity);
+        adjust_capacity(table, new_capacity);
     }
 
     table_entry* entry = find_entry(table->entries, table->capacity, key);
     bool is_new_key = entry->key == NULL;
-
-    if (is_new_key) {
+    if (is_new_key && IS_NULL(entry->value)) {
         table->count++;
     }
 
     entry->key = key;
     entry->value = value;
+
+    return is_new_key;
+}
+
+bool hash_table_delete(hash_table* table, object_string* key) {
+    if (table->count == 0) {
+        return false;
+    }
+
+    table_entry* entry = find_entry(table->entries, table->capacity, key);
+    if (entry->key == NULL) {
+        return false;
+    }
+
+    entry->key = NULL;
+    entry->value = BOOL_VAL(true);
+    return true;
+}
+
+void table_add_all(hash_table* from, hash_table* to) {
+    for (size_t i = 0; i < from->capacity; ++i) {
+        table_entry* entry = &from->entries[i];
+        if (entry->key != NULL) {
+            hash_table_set(to, entry->key, entry->value);
+        }
+    }
 }

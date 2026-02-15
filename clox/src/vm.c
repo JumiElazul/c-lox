@@ -4,6 +4,7 @@
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include "hash_table.h"
 #include "memory.h"
 #include "object.h"
 #include <stdarg.h>
@@ -54,9 +55,12 @@ static void runtime_error(const char* format, ...) {
 void init_vm() {
     vm_reset_stack();
     vm.objects = NULL;
+    init_hash_table(&vm.strings);
 }
 
 void free_vm() {
+    free_hash_table(&vm.strings);
+    free_objects();
 }
 
 static interpret_result run() {

@@ -1,6 +1,7 @@
 #ifndef CLOX_VM_H
 #define CLOX_VM_H
 #include "bytecode_chunk.h"
+#include "hash_table.h"
 #include "object.h"
 
 #define STACK_MAX 256
@@ -10,6 +11,7 @@ typedef struct {
     uint8_t* ip;
     clox_value stack[STACK_MAX];
     clox_value* sp;
+    hash_table strings;
     object* objects;
 } VM;
 
