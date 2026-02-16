@@ -63,7 +63,7 @@ static void error_at(token* tok, const char* message) {
     } else if (tok->type == TOKEN_ERROR) {
 
     } else {
-        fprintf(stderr, " at '%.*s'", tok->length, tok->start);
+        fprintf(stderr, " at '%.*s'", (uint32_t)tok->length, tok->start);
     }
 
     fprintf(stderr, ": %s\n", message);
