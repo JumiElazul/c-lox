@@ -95,7 +95,7 @@ static interpret_result run() {
                 vm_stack_push(constant);
             } break;
             case OP_NULL: {
-                vm_stack_push(NULL_VAL());
+                vm_stack_push(NULL_VAL);
             } break;
             case OP_TRUE: {
                 vm_stack_push(BOOL_VAL(true));

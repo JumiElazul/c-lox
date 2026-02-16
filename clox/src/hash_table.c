@@ -12,7 +12,7 @@ void init_hash_table(hash_table* table) {
 }
 
 void free_hash_table(hash_table* table) {
-    FREE_ARRAY(table_entry, table->entries, table->count);
+    FREE_ARRAY(table_entry, table->entries, table->capacity);
     init_hash_table(table);
 }
 
@@ -38,6 +38,7 @@ static table_entry* find_entry(table_entry* entries, size_t capacity, object_str
         } else if (entry->key == key) {
             return entry;
         }
+
         index = (index + 1) % capacity;
     }
 }
@@ -115,11 +116,34 @@ bool hash_table_delete(hash_table* table, object_string* key) {
     return true;
 }
 
-void table_add_all(hash_table* from, hash_table* to) {
+void hash_table_add_all(hash_table* from, hash_table* to) {
     for (size_t i = 0; i < from->capacity; ++i) {
         table_entry* entry = &from->entries[i];
         if (entry->key != NULL) {
             hash_table_set(to, entry->key, entry->value);
         }
+    }
+}
+
+object_string* hash_table_find_string(hash_table* table, const char* chars, size_t length,
+                                      uint32_t hash) {
+    if (table->count == 0) {
+        return NULL;
+    }
+
+    uint32_t index = hash % table->capacity;
+    for (;;) {
+        table_entry* entry = &table->entries[index];
+
+        if (entry->key == NULL) {
+            if (IS_NULL(entry->value)) {
+                return NULL;
+            }
+        } else if (entry->key->length == length && entry->key->hash == hash &&
+                   memcmp(entry->key->chars, chars, length) == 0) {
+            return entry->key;
+        }
+
+        index = (index + 1) % table->capacity;
     }
 }

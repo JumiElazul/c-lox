@@ -10,6 +10,8 @@ set(SOURCES
     "src/compiler.c"
     "src/debug.h"
     "src/debug.c"
+    "src/hash_table.h"
+    "src/hash_table.c"
     "src/lexer.h"
     "src/lexer.c"
     "src/memory.h"
