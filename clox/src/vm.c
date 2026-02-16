@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "assert.h"
 #include "bytecode_chunk.h"
+#include "clox_value.h"
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
@@ -103,17 +104,13 @@ static interpret_result run() {
             case OP_FALSE: {
                 vm_stack_push(BOOL_VAL(false));
             } break;
+            case OP_POP: {
+                vm_stack_pop();
+            } break;
             case OP_EQUAL: {
                 clox_value b = vm_stack_pop();
                 clox_value a = vm_stack_pop();
                 vm_stack_push(BOOL_VAL(values_equal(a, b)));
-            } break;
-            case OP_NEGATE: {
-                if (!IS_NUMBER(peek_stack(0))) {
-                    runtime_error("Operand must be a number.");
-                    return INTERPRET_RUNTIME_ERROR;
-                }
-                vm_stack_push(NUMBER_VAL(-AS_NUMBER(vm_stack_pop())));
             } break;
             case OP_GREATER: {
                 BINARY_OP(BOOL_VAL, >);
@@ -145,9 +142,18 @@ static interpret_result run() {
             case OP_NOT: {
                 vm_stack_push(BOOL_VAL(is_falsey(vm_stack_pop())));
             } break;
-            case OP_RETURN: {
+            case OP_NEGATE: {
+                if (!IS_NUMBER(peek_stack(0))) {
+                    runtime_error("Operand must be a number.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                vm_stack_push(NUMBER_VAL(-AS_NUMBER(vm_stack_pop())));
+            } break;
+            case OP_PRINT: {
                 print_value(vm_stack_pop());
                 printf("\n");
+            } break;
+            case OP_RETURN: {
                 return INTERPRET_OK;
             }
         }

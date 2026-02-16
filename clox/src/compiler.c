@@ -45,6 +45,8 @@ bytecode_chunk* compiling_chunk;
 static void parse_expression();
 static parse_rule* get_rule(token_type type);
 static void parse_precedence(precedence prec);
+static void declaration();
+static void statement();
 
 static bytecode_chunk* current_chunk() {
     return compiling_chunk;
@@ -98,6 +100,19 @@ static void consume_if_matches(token_type type, const char* message) {
     }
 
     error_at_current(message);
+}
+
+static bool check_token(token_type type) {
+    return parse.current.type == type;
+}
+
+static bool matches_token(token_type expected) {
+    if (!check_token(expected)) {
+        return false;
+    }
+
+    advance_parser();
+    return true;
 }
 
 static void emit_byte(uint8_t byte) {
@@ -299,6 +314,61 @@ static void parse_expression() {
     parse_precedence(PREC_ASSIGNMENT);
 }
 
+static void print_statement() {
+    consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after print statement.");
+    parse_expression();
+    consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' to close print statement.");
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after print statement closing.");
+    emit_byte(OP_PRINT);
+}
+
+static void synchronize() {
+    parse.panic_mode = false;
+
+    while (parse.current.type != TOKEN_EOF) {
+        if (parse.previous.type == TOKEN_SEMICOLON) {
+            return;
+        }
+
+        switch (parse.current.type) {
+            case TOKEN_CLASS:
+            case TOKEN_FUN:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_PRINT:
+            case TOKEN_RETURN:
+                return;
+            default:;
+        }
+
+        advance_parser();
+    }
+}
+
+static void expression_statement() {
+    parse_expression();
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after expression.");
+    emit_byte(OP_POP);
+}
+
+static void declaration() {
+    statement();
+
+    if (parse.panic_mode) {
+        synchronize();
+    }
+}
+
+static void statement() {
+    if (matches_token(TOKEN_PRINT)) {
+        print_statement();
+    } else {
+        expression_statement();
+    }
+}
+
 bool compile(const char* source, bytecode_chunk* chunk) {
     init_lexer(source);
 
@@ -307,8 +377,11 @@ bool compile(const char* source, bytecode_chunk* chunk) {
     parse.panic_mode = false;
 
     advance_parser();
-    parse_expression();
-    consume_if_matches(TOKEN_EOF, "Expect end of expression.");
+
+    while (!matches_token(TOKEN_EOF)) {
+        declaration();
+    }
+
     end_compiler();
     return !parse.had_error;
 }
