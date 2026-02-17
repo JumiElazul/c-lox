@@ -25,8 +25,10 @@ static table_entry* find_entry(table_entry* entries, size_t capacity, object_str
 
         if (entry->key == NULL) {
             if (IS_NULL(entry->value)) {
+                // A truly null entry, not a tombstone.
                 return first_tombstone != NULL ? first_tombstone : entry;
             } else {
+                // A tombstone.
                 if (first_tombstone == NULL) {
                     first_tombstone = entry;
                 }
