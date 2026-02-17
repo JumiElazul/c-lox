@@ -47,6 +47,8 @@ size_t disassemble_instruction(bytecode_chunk* chunk, size_t offset) {
             return simple_instruction("OP_POP", offset);
         case OP_DEFINE_GLOBAL:
             return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
+        case OP_DEFINE_CONST_GLOBAL:
+            return constant_instruction("OP_DEFINE_CONST_GLOBAL", chunk, offset);
         case OP_EQUAL:
             return simple_instruction("OP_EQUAL", offset);
         case OP_GREATER:

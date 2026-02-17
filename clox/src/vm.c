@@ -115,6 +115,9 @@ static interpret_result run() {
                 hash_table_set(&vm.globals, name, peek_stack(0));
                 vm_stack_pop();
             } break;
+            case OP_DEFINE_CONST_GLOBAL: {
+                assert(false && "Unimplemented");
+            } break;
             case OP_EQUAL: {
                 clox_value b = vm_stack_pop();
                 clox_value a = vm_stack_pop();

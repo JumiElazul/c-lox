@@ -32,7 +32,6 @@ target_compile_options(clox PRIVATE
     -pedantic-errors
     -Wno-unused-parameter
     -Wshadow
-    -Wconversion
     -Wno-switch-enum
     -Wno-switch
     -fsigned-char
