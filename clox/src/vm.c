@@ -56,10 +56,12 @@ static void runtime_error(const char* format, ...) {
 void init_vm() {
     vm_reset_stack();
     vm.objects = NULL;
+    init_hash_table(&vm.globals);
     init_hash_table(&vm.strings);
 }
 
 void free_vm() {
+    free_hash_table(&vm.globals);
     free_hash_table(&vm.strings);
     free_objects();
 }
@@ -67,6 +69,7 @@ void free_vm() {
 static interpret_result run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type, op) \
     do { \
         if (!IS_NUMBER(peek_stack(0)) || !IS_NUMBER(peek_stack(1))) { \
@@ -105,6 +108,11 @@ static interpret_result run() {
                 vm_stack_push(BOOL_VAL(false));
             } break;
             case OP_POP: {
+                vm_stack_pop();
+            } break;
+            case OP_DEFINE_GLOBAL: {
+                object_string* name = READ_STRING();
+                hash_table_set(&vm.globals, name, peek_stack(0));
                 vm_stack_pop();
             } break;
             case OP_EQUAL: {
@@ -153,6 +161,16 @@ static interpret_result run() {
                 print_value(vm_stack_pop());
                 printf("\n");
             } break;
+            case OP_DEBUG: {
+                printf("global variables:\n");
+                for (size_t i = 0; i < vm.globals.capacity; ++i) {
+                    table_entry* entry = &vm.globals.entries[i];
+                    if (entry->key) {
+                        printf("%s ", entry->key->chars);
+                    }
+                }
+                printf("\n");
+            } break;
             case OP_RETURN: {
                 return INTERPRET_OK;
             }
@@ -161,6 +179,7 @@ static interpret_result run() {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRING
 #undef BINARY_OP
 }
 

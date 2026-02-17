@@ -16,10 +16,6 @@ void free_hash_table(hash_table* table) {
     init_hash_table(table);
 }
 
-static bool is_tombstone(table_entry* entry) {
-    return entry->key == NULL && IS_BOOL(entry->value) && AS_BOOL(entry->value);
-}
-
 static table_entry* find_entry(table_entry* entries, size_t capacity, object_string* key) {
     uint32_t index = key->hash % capacity;
     table_entry* first_tombstone = NULL;
@@ -28,11 +24,11 @@ static table_entry* find_entry(table_entry* entries, size_t capacity, object_str
         table_entry* entry = &entries[index];
 
         if (entry->key == NULL) {
-            if (is_tombstone(entry)) {
+            if (IS_NULL(entry->value)) {
+                return first_tombstone != NULL ? first_tombstone : entry;
+            } else {
                 if (first_tombstone == NULL) {
                     first_tombstone = entry;
-                } else {
-                    return first_tombstone != NULL ? first_tombstone : entry;
                 }
             }
         } else if (entry->key == key) {

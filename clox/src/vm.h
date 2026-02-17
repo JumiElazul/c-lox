@@ -11,6 +11,7 @@ typedef struct {
     uint8_t* ip;
     clox_value stack[STACK_MAX];
     clox_value* sp;
+    hash_table globals;
     hash_table strings;
     object* objects;
 } VM;

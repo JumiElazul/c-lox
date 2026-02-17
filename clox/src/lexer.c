@@ -57,7 +57,7 @@ static token make_token(token_type type) {
     token tok;
     tok.type = type;
     tok.start = lex.start;
-    tok.length = (int)(lex.current - lex.start);
+    tok.length = (size_t)(lex.current - lex.start);
     tok.line = lex.line;
     return tok;
 }
@@ -66,7 +66,7 @@ static token error_token(const char* message) {
     token tok;
     tok.type = TOKEN_ERROR;
     tok.start = message;
-    tok.length = (int)strlen(message);
+    tok.length = (size_t)strlen(message);
     tok.line = lex.line;
     return tok;
 }
@@ -113,7 +113,17 @@ static token_type identifier_type() {
         case 'a':
             return check_keyword(1, 2, "nd", TOKEN_AND);
         case 'c':
-            return check_keyword(1, 4, "lass", TOKEN_CLASS);
+            if (lex.current - lex.start > 1) {
+                switch (lex.start[1]) {
+                    case 'l':
+                        return check_keyword(2, 3, "ass", TOKEN_CLASS);
+                    case 'o':
+                        return check_keyword(2, 3, "nst", TOKEN_CONST);
+                }
+            }
+            break;
+        case 'd':
+            return check_keyword(1, 4, "ebug", TOKEN_DEBUG);
         case 'e':
             return check_keyword(1, 3, "lse", TOKEN_ELSE);
         case 'f':
@@ -131,11 +141,7 @@ static token_type identifier_type() {
         case 'i':
             return check_keyword(1, 1, "f", TOKEN_IF);
         case 'n':
-            if (lex.current - lex.start > 1) {
-                if (lex.start[1] == 'u') {
-                    return check_keyword(2, 2, "ll", TOKEN_NULL);
-                }
-            }
+            return check_keyword(1, 3, "ull", TOKEN_NULL);
         case 'o':
             return check_keyword(1, 1, "r", TOKEN_OR);
         case 'p':

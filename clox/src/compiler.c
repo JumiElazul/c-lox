@@ -306,6 +306,19 @@ static void parse_precedence(precedence prec) {
     }
 }
 
+static uint8_t identifier_constant(token* name) {
+    return make_constant(OBJECT_VAL(copy_string(name->start, name->length)));
+}
+
+static uint8_t parse_variable(const char* err_message) {
+    consume_if_matches(TOKEN_IDENTIFIER, err_message);
+    return identifier_constant(&parse.previous);
+}
+
+static void define_variable(uint8_t global) {
+    emit_bytes2(OP_DEFINE_GLOBAL, global);
+}
+
 static parse_rule* get_rule(token_type type) {
     return &rules[type];
 }
@@ -314,12 +327,31 @@ static void parse_expression() {
     parse_precedence(PREC_ASSIGNMENT);
 }
 
+static void variable_declaration() {
+    uint8_t global = parse_variable("Expected variable name.");
+
+    if (matches_token(TOKEN_EQUAL)) {
+        parse_expression();
+    } else {
+        emit_byte(OP_NULL);
+    }
+
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+
+    define_variable(global);
+}
+
 static void print_statement() {
     consume_if_matches(TOKEN_LEFT_PAREN, "Expected '(' after print statement.");
     parse_expression();
     consume_if_matches(TOKEN_RIGHT_PAREN, "Expected ')' to close print statement.");
     consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after print statement closing.");
     emit_byte(OP_PRINT);
+}
+
+static void debug_statement() {
+    emit_byte(OP_DEBUG);
+    consume_if_matches(TOKEN_SEMICOLON, "Expected ';' after debug statement.");
 }
 
 static void synchronize() {
@@ -354,7 +386,11 @@ static void expression_statement() {
 }
 
 static void declaration() {
-    statement();
+    if (matches_token(TOKEN_VAR)) {
+        variable_declaration();
+    } else {
+        statement();
+    }
 
     if (parse.panic_mode) {
         synchronize();
@@ -364,6 +400,8 @@ static void declaration() {
 static void statement() {
     if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_DEBUG)) {
+        debug_statement();
     } else {
         expression_statement();
     }
