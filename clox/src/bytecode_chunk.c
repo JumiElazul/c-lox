@@ -32,6 +32,16 @@ void write_bytecode_chunk(bytecode_chunk* chunk, uint8_t byte, int line) {
 }
 
 int add_constant(bytecode_chunk* chunk, clox_value value) {
+    // Do a simple linear scan to see if the value is already in the constant table, and return
+    // the index if it is.  This will slow down compile time a bit but make us far less likely
+    // to hit our current 255 constant limit per chunk.
+    for (size_t index = 0; index < chunk->constants.count; ++index) {
+        clox_value* entry = &chunk->constants.values[index];
+        if (values_equal(*entry, value)) {
+            return index;
+        }
+    }
+
     write_value_array(&chunk->constants, value);
     return (int)chunk->constants.count - 1;
 }
