@@ -110,6 +110,15 @@ static interpret_result run() {
             case OP_POP: {
                 vm_stack_pop();
             } break;
+            case OP_GET_GLOBAL: {
+                object_string* name = READ_STRING();
+                clox_value value;
+                if (!hash_table_get(&vm.globals, name, &value)) {
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                vm_stack_push(value);
+            } break;
             case OP_DEFINE_GLOBAL: {
                 object_string* name = READ_STRING();
                 hash_table_set(&vm.globals, name, peek_stack(0));
@@ -117,6 +126,14 @@ static interpret_result run() {
             } break;
             case OP_DEFINE_CONST_GLOBAL: {
                 assert(false && "Unimplemented");
+            } break;
+            case OP_SET_GLOBAL: {
+                object_string* name = READ_STRING();
+                if (hash_table_set(&vm.globals, name, peek_stack(0))) {
+                    hash_table_delete(&vm.globals, name);
+                    runtime_error("Undefined variable '%s'.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
             } break;
             case OP_EQUAL: {
                 clox_value b = vm_stack_pop();
