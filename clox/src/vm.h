@@ -12,6 +12,7 @@ typedef struct {
     clox_value stack[STACK_MAX];
     clox_value* sp;
     hash_table globals;
+    hash_table const_globals;
     hash_table strings;
     object* objects;
 } VM;

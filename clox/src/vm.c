@@ -57,11 +57,13 @@ void init_vm() {
     vm_reset_stack();
     vm.objects = NULL;
     init_hash_table(&vm.globals);
+    init_hash_table(&vm.const_globals);
     init_hash_table(&vm.strings);
 }
 
 void free_vm() {
     free_hash_table(&vm.globals);
+    free_hash_table(&vm.const_globals);
     free_hash_table(&vm.strings);
     free_objects();
 }
@@ -113,9 +115,11 @@ static interpret_result run() {
             case OP_GET_GLOBAL: {
                 object_string* name = READ_STRING();
                 clox_value value;
-                if (!hash_table_get(&vm.globals, name, &value)) {
-                    runtime_error("Undefined variable '%s'.", name->chars);
-                    return INTERPRET_RUNTIME_ERROR;
+                if (!hash_table_get(&vm.const_globals, name, &value)) {
+                    if (!hash_table_get(&vm.globals, name, &value)) {
+                        runtime_error("Undefined variable '%s'.", name->chars);
+                        return INTERPRET_RUNTIME_ERROR;
+                    }
                 }
                 vm_stack_push(value);
             } break;
@@ -125,10 +129,18 @@ static interpret_result run() {
                 vm_stack_pop();
             } break;
             case OP_DEFINE_CONST_GLOBAL: {
-                assert(false && "Unimplemented");
+                object_string* name = READ_STRING();
+                hash_table_set(&vm.const_globals, name, peek_stack(0));
+                vm_stack_pop();
             } break;
             case OP_SET_GLOBAL: {
                 object_string* name = READ_STRING();
+                clox_value value;
+                if (hash_table_get(&vm.const_globals, name, &value)) {
+                    runtime_error("Cannot reassign to variable marked 'const'.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
                 if (hash_table_set(&vm.globals, name, peek_stack(0))) {
                     hash_table_delete(&vm.globals, name);
                     runtime_error("Undefined variable '%s'.");

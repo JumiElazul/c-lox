@@ -336,8 +336,9 @@ static uint8_t parse_variable(const char* err_message) {
     return identifier_constant(&parse.previous);
 }
 
-static void define_variable(uint8_t global) {
-    emit_bytes2(OP_DEFINE_GLOBAL, global);
+static void define_variable(uint8_t global, bool is_const) {
+    uint8_t instr = is_const ? OP_DEFINE_CONST_GLOBAL : OP_DEFINE_GLOBAL;
+    emit_bytes2(instr, global);
 }
 
 static parse_rule* get_rule(token_type type) {
@@ -348,18 +349,22 @@ static void parse_expression() {
     parse_precedence(PREC_ASSIGNMENT);
 }
 
-static void variable_declaration() {
+static void variable_declaration(bool is_const) {
     uint8_t global = parse_variable("Expected variable name.");
 
     if (matches_token(TOKEN_EQUAL)) {
         parse_expression();
     } else {
-        emit_byte(OP_NULL);
+        if (is_const) {
+            error_at_current("Variable marked 'const' must have an initializer expression.");
+        } else {
+            emit_byte(OP_NULL);
+        }
     }
 
     must_consume_token(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
 
-    define_variable(global);
+    define_variable(global, is_const);
 }
 
 static void print_statement() {
@@ -407,8 +412,14 @@ static void expression_statement() {
 }
 
 static void declaration() {
-    if (matches_token(TOKEN_VAR)) {
-        variable_declaration();
+    if (matches_token(TOKEN_CONST)) {
+        if (!matches_token(TOKEN_VAR)) {
+            error_at_current("Expected 'var' keyword after const declaration.");
+        } else {
+            variable_declaration(true);
+        }
+    } else if (matches_token(TOKEN_VAR)) {
+        variable_declaration(false);
     } else {
         statement();
     }
