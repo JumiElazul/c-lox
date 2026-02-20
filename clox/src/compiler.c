@@ -367,6 +367,14 @@ static void variable_declaration(bool is_const) {
     define_variable(global, is_const);
 }
 
+static void const_variable_declaration() {
+    if (!matches_token(TOKEN_VAR)) {
+        error_at_current("Expected 'var' keyword after const declaration.");
+    } else {
+        variable_declaration(true);
+    }
+}
+
 static void print_statement() {
     must_consume_token(TOKEN_LEFT_PAREN, "Expected '(' after print statement.");
     parse_expression();
@@ -413,11 +421,7 @@ static void expression_statement() {
 
 static void declaration() {
     if (matches_token(TOKEN_CONST)) {
-        if (!matches_token(TOKEN_VAR)) {
-            error_at_current("Expected 'var' keyword after const declaration.");
-        } else {
-            variable_declaration(true);
-        }
+        const_variable_declaration();
     } else if (matches_token(TOKEN_VAR)) {
         variable_declaration(false);
     } else {
