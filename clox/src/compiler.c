@@ -39,7 +39,19 @@ typedef struct {
     precedence prec;
 } parse_rule;
 
+typedef struct {
+    token name;
+    int depth;
+} local_variable;
+
+typedef struct {
+    local_variable locals[UINT8_COUNT];
+    int local_count;
+    int scope_depth;
+} compiler;
+
 parser parse;
+compiler* current_comp = NULL;
 bytecode_chunk* compiling_chunk;
 
 static void parse_expression();
@@ -142,6 +154,12 @@ static void emit_constant(clox_value value) {
     emit_bytes2(OP_CONSTANT, make_constant(value));
 }
 
+static void init_compiler(compiler* comp) {
+    comp->local_count = 0;
+    comp->scope_depth = 0;
+    current_comp = comp;
+}
+
 static void end_compiler() {
     emit_return();
 #ifdef DEBUG_PRINT_CODE
@@ -149,6 +167,14 @@ static void end_compiler() {
         disassemble_chunk(current_chunk(), "code");
     }
 #endif
+}
+
+static void begin_scope() {
+    current_comp->scope_depth++;
+}
+
+static void end_scope() {
+    current_comp->scope_depth--;
 }
 
 static void binary(bool can_assign) {
@@ -349,6 +375,14 @@ static void parse_expression() {
     parse_precedence(PREC_ASSIGNMENT);
 }
 
+static void block_statement() {
+    while (!check_token(TOKEN_RIGHT_BRACE) && !check_token(TOKEN_EOF)) {
+        declaration();
+    }
+
+    must_consume_token(TOKEN_RIGHT_BRACE, "Expected '}' after block statement.");
+}
+
 static void variable_declaration(bool is_const) {
     uint8_t global = parse_variable("Expected variable name.");
 
@@ -434,10 +468,14 @@ static void declaration() {
 }
 
 static void statement() {
-    if (matches_token(TOKEN_PRINT)) {
-        print_statement();
-    } else if (matches_token(TOKEN_DEBUG)) {
+    if (matches_token(TOKEN_DEBUG)) {
         debug_statement();
+    } else if (matches_token(TOKEN_PRINT)) {
+        print_statement();
+    } else if (matches_token(TOKEN_LEFT_BRACE)) {
+        begin_scope();
+        block_statement();
+        end_scope();
     } else {
         expression_statement();
     }
@@ -445,6 +483,9 @@ static void statement() {
 
 bool compile(const char* source, bytecode_chunk* chunk) {
     init_lexer(source);
+
+    compiler comp;
+    init_compiler(&comp);
 
     compiling_chunk = chunk;
     parse.had_error = false;
