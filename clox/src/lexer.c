@@ -138,6 +138,8 @@ static token_type identifier_type() {
                 }
             }
             break;
+        case 'g':
+            return check_keyword(1, 5, "lobal", TOKEN_GLOBAL);
         case 'i':
             return check_keyword(1, 1, "f", TOKEN_IF);
         case 'n':

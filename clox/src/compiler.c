@@ -261,16 +261,20 @@ static void string(bool can_assign) {
     emit_constant(OBJECT_VAL(str));
 }
 
-static void named_variable(token name, bool can_assign) {
+static void named_variable(token name, bool can_assign, bool global_key) {
     uint8_t get_op;
     uint8_t set_op;
 
-    int arg = resolve_local(current_comp, &name);
+    int arg = -1;
+    if (!global_key) {
+        arg = resolve_local(current_comp, &name);
+    }
 
     if (arg != -1) {
         get_op = OP_GET_LOCAL;
         set_op = OP_SET_LOCAL;
     } else {
+        arg = identifier_constant(&name);
         get_op = OP_GET_GLOBAL;
         set_op = OP_SET_GLOBAL;
     }
@@ -284,7 +288,15 @@ static void named_variable(token name, bool can_assign) {
 }
 
 static void variable(bool can_assign) {
-    named_variable(parse.previous, can_assign);
+    named_variable(parse.previous, can_assign, false);
+}
+
+static void g_variable(bool can_assign) {
+    must_consume_token(TOKEN_LEFT_PAREN, "Keyword 'global' must have a following opening '('.");
+    must_consume_token(TOKEN_IDENTIFIER,
+                       "'global' must have a variable specified. 'global(my_var)'.");
+    named_variable(parse.previous, can_assign, true);
+    must_consume_token(TOKEN_RIGHT_PAREN, "'global' must have a closing ')'.");
 }
 
 static void unary(bool can_assign) {
@@ -306,46 +318,47 @@ static void unary(bool can_assign) {
 
 // clang-format off
 parse_rule rules[] = {
-    [TOKEN_LEFT_PAREN]    = {grouping, NULL,    PREC_NONE       },
-    [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_LEFT_BRACE]    = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_COMMA]         = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_DOT]           = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_MINUS]         = {unary,    binary,  PREC_TERM       },
-    [TOKEN_PLUS]          = {NULL,     binary,  PREC_TERM       },
-    [TOKEN_SEMICOLON]     = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_SLASH]         = {NULL,     binary,  PREC_FACTOR     },
-    [TOKEN_STAR]          = {NULL,     binary,  PREC_FACTOR     },
-    [TOKEN_BANG]          = {unary,    NULL,    PREC_NONE       },
-    [TOKEN_BANG_EQUAL]    = {NULL,     binary,  PREC_EQUALITY   },
-    [TOKEN_EQUAL]         = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_EQUAL_EQUAL]   = {NULL,     binary,  PREC_EQUALITY   },
-    [TOKEN_GREATER]       = {NULL,     binary,  PREC_COMPARISON },
-    [TOKEN_GREATER_EQUAL] = {NULL,     binary,  PREC_COMPARISON },
-    [TOKEN_LESS]          = {NULL,     binary,  PREC_COMPARISON },
-    [TOKEN_LESS_EQUAL]    = {NULL,     binary,  PREC_COMPARISON },
-    [TOKEN_IDENTIFIER]    = {variable, NULL,    PREC_NONE       },
-    [TOKEN_STRING]        = {string,   NULL,    PREC_NONE       },
-    [TOKEN_NUMBER]        = {number,   NULL,    PREC_NONE       },
-    [TOKEN_AND]           = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_CLASS]         = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_ELSE]          = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_FALSE]         = {literal,  NULL,    PREC_NONE       },
-    [TOKEN_FOR]           = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_FUN]           = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_IF]            = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_NULL]          = {literal,  NULL,    PREC_NONE       },
-    [TOKEN_OR]            = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_PRINT]         = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_RETURN]        = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_SUPER]         = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_THIS]          = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_TRUE]          = {literal,  NULL,    PREC_NONE       },
-    [TOKEN_VAR]           = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_WHILE]         = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_ERROR]         = {NULL,     NULL,    PREC_NONE       },
-    [TOKEN_EOF]           = {NULL,     NULL,    PREC_NONE       },
+    [TOKEN_LEFT_PAREN]    = {grouping,   NULL,    PREC_NONE       },
+    [TOKEN_RIGHT_PAREN]   = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_LEFT_BRACE]    = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_RIGHT_BRACE]   = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_COMMA]         = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_DOT]           = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_MINUS]         = {unary,      binary,  PREC_TERM       },
+    [TOKEN_PLUS]          = {NULL,       binary,  PREC_TERM       },
+    [TOKEN_SEMICOLON]     = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_SLASH]         = {NULL,       binary,  PREC_FACTOR     },
+    [TOKEN_STAR]          = {NULL,       binary,  PREC_FACTOR     },
+    [TOKEN_BANG]          = {unary,      NULL,    PREC_NONE       },
+    [TOKEN_BANG_EQUAL]    = {NULL,       binary,  PREC_EQUALITY   },
+    [TOKEN_EQUAL]         = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_EQUAL_EQUAL]   = {NULL,       binary,  PREC_EQUALITY   },
+    [TOKEN_GREATER]       = {NULL,       binary,  PREC_COMPARISON },
+    [TOKEN_GREATER_EQUAL] = {NULL,       binary,  PREC_COMPARISON },
+    [TOKEN_LESS]          = {NULL,       binary,  PREC_COMPARISON },
+    [TOKEN_LESS_EQUAL]    = {NULL,       binary,  PREC_COMPARISON },
+    [TOKEN_IDENTIFIER]    = {variable,   NULL,    PREC_NONE       },
+    [TOKEN_STRING]        = {string,     NULL,    PREC_NONE       },
+    [TOKEN_NUMBER]        = {number,     NULL,    PREC_NONE       },
+    [TOKEN_AND]           = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_CLASS]         = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_ELSE]          = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_FALSE]         = {literal,    NULL,    PREC_NONE       },
+    [TOKEN_FOR]           = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_FUN]           = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_IF]            = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_NULL]          = {literal,    NULL,    PREC_NONE       },
+    [TOKEN_OR]            = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_PRINT]         = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_RETURN]        = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_SUPER]         = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_THIS]          = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_TRUE]          = {literal,    NULL,    PREC_NONE       },
+    [TOKEN_VAR]           = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_WHILE]         = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_GLOBAL]        = {g_variable, NULL,    PREC_NONE       },
+    [TOKEN_ERROR]         = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_EOF]           = {NULL,       NULL,    PREC_NONE       },
 };
 // clang-format on
 
