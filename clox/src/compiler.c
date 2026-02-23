@@ -185,6 +185,10 @@ static void end_scope() {
     }
 }
 
+static bool is_local_scope() {
+    return current_comp->scope_depth > 0;
+}
+
 static void binary(bool can_assign) {
     token_type operator_type = parse.previous.type;
     parse_rule* rule = get_rule(operator_type);
@@ -410,10 +414,6 @@ static void add_local_variable(token name) {
 }
 
 static void declare_variable() {
-    if (current_comp->scope_depth == 0) {
-        return;
-    }
-
     token* name = &parse.previous;
 
     for (int i = current_comp->local_count - 1; i >= 0; --i) {
@@ -433,8 +433,8 @@ static void declare_variable() {
 static uint8_t parse_variable(const char* err_message) {
     must_consume_token(TOKEN_IDENTIFIER, err_message);
 
-    declare_variable();
-    if (current_comp->scope_depth > 0) {
+    if (is_local_scope()) {
+        declare_variable();
         return 0;
     }
 
@@ -445,12 +445,7 @@ static void mark_initialized() {
     current_comp->locals[current_comp->local_count - 1].depth = current_comp->scope_depth;
 }
 
-static void define_variable(uint8_t global, bool is_const) {
-    if (current_comp->scope_depth > 0) {
-        mark_initialized();
-        return;
-    }
-
+static void define_global_variable(uint8_t global, bool is_const) {
     uint8_t instr = is_const ? OP_DEFINE_CONST_GLOBAL : OP_DEFINE_GLOBAL;
     emit_bytes2(instr, global);
 }
@@ -485,7 +480,12 @@ static void variable_declaration(bool is_const) {
     }
 
     must_consume_token(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-    define_variable(global, is_const);
+
+    if (is_local_scope()) {
+        mark_initialized();
+    } else {
+        define_global_variable(global, is_const);
+    }
 }
 
 static void const_variable_declaration() {
