@@ -85,7 +85,7 @@ static interpret_result run() {
 
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
-        printf("        ");
+        printf("stack:  ");
         for (clox_value* slot = vm.stack; slot < vm.sp; ++slot) {
             printf("[");
             print_value(*slot);
