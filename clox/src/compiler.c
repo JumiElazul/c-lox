@@ -403,7 +403,7 @@ static bool identifiers_equal(token* a, token* b) {
 
 static int resolve_local(compiler* comp, token* name) {
     for (int i = comp->local_count - 1; i >= 0; --i) {
-        local_variable* local = &current_comp->locals[i];
+        local_variable* local = &comp->locals[i];
         if (identifiers_equal(name, &local->name)) {
             if (local->depth == -1) {
                 error("Can't read local variable in its own initializer.");
