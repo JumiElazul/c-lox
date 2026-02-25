@@ -587,10 +587,15 @@ static void if_statement() {
     must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after 'if' condition.");
 
     int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+
+    // 'then' path.  OP_POP, followed by statement(), ending with skipping over the 'else' case.
     emit_byte(OP_POP);
     statement();
+    // The 'then' branch needs to skip over the else case, so we need an unconditional jump.
     int else_jump = emit_jump(OP_JUMP);
     patch_jump(then_jump);
+
+    // 'else' path.  OP_POP, followed by compiling the statement.
     emit_byte(OP_POP);
 
     if (matches_token(TOKEN_ELSE)) {
