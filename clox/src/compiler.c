@@ -3,6 +3,7 @@
 #include "common.h"
 #include "lexer.h"
 #include "object.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,8 @@
 #ifdef DEBUG_PRINT_CODE
 #include "debug.h"
 #endif
+
+#define JUMP_OPERAND_SIZE 2
 
 typedef struct {
     token current;
@@ -141,9 +144,12 @@ static void emit_bytes2(uint8_t byte1, uint8_t byte2) {
 
 static int emit_jump(uint8_t instruction) {
     emit_byte(instruction);
-    emit_byte(0xFF);
-    emit_byte(0xFF);
-    return current_chunk()->count - 2;
+
+    for (int i = 0; i < JUMP_OPERAND_SIZE; ++i) {
+        emit_byte(0xFF);
+    }
+
+    return current_chunk()->count - JUMP_OPERAND_SIZE;
 }
 
 static void emit_return() {
@@ -164,14 +170,18 @@ static void emit_constant(clox_value value) {
 }
 
 static void patch_jump(int offset) {
-    int jump = current_chunk()->count - offset - 2;
+    int jump = current_chunk()->count - offset - JUMP_OPERAND_SIZE;
 
     if (jump > UINT16_MAX) {
         error("Too much code to jump over.");
     }
 
-    current_chunk()->code[offset] = (jump >> 8) & 0xFF;
-    current_chunk()->code[offset + 1] = jump & 0xFF;
+    int byte_offset = JUMP_OPERAND_SIZE * 8;
+    for (int i = 0; i < JUMP_OPERAND_SIZE; ++i) {
+        byte_offset -= 8;
+        assert(byte_offset >= 0);
+        current_chunk()->code[offset + i] = (jump >> byte_offset) & 0xFF;
+    }
 }
 
 static void init_compiler(compiler* comp) {
