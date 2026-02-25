@@ -586,9 +586,18 @@ static void if_statement() {
     parse_expression();
     must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after 'if' condition.");
 
-    int else_branch_jump = emit_jump(OP_JUMP_IF_FALSE);
+    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
     statement();
-    patch_jump(else_branch_jump);
+    int else_jump = emit_jump(OP_JUMP);
+    patch_jump(then_jump);
+    emit_byte(OP_POP);
+
+    if (matches_token(TOKEN_ELSE)) {
+        statement();
+    }
+
+    patch_jump(else_jump);
 }
 
 static void declaration() {
