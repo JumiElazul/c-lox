@@ -586,23 +586,47 @@ static void if_statement() {
     parse_expression();
     must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after 'if' condition.");
 
-    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+    int false_jump = emit_jump(OP_JUMP_IF_FALSE);
 
-    // 'then' path.  OP_POP, followed by statement(), ending with skipping over the 'else' case.
+    // True path
     emit_byte(OP_POP);
     statement();
-    // The 'then' branch needs to skip over the else case, so we need an unconditional jump.
-    int else_jump = emit_jump(OP_JUMP);
-    patch_jump(then_jump);
 
-    // 'else' path.  OP_POP, followed by compiling the statement.
+    int end_jumps[256];
+    int end_jump_count = 0;
+    end_jumps[end_jump_count++] = emit_jump(OP_JUMP);
+
+    patch_jump(false_jump);
+
+    // False path
     emit_byte(OP_POP);
 
-    if (matches_token(TOKEN_ELSE)) {
+    // 'else if' cases
+    while (matches_token(TOKEN_ELSE) && matches_token(TOKEN_IF)) {
+        must_consume_token(TOKEN_LEFT_PAREN, "Expected '(' after 'else if'.");
+        parse_expression();
+        must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after 'else if' condition.");
+
+        false_jump = emit_jump(OP_JUMP_IF_FALSE);
+
+        // True path
+        emit_byte(OP_POP);
+        statement();
+        end_jumps[end_jump_count++] = emit_jump(OP_JUMP);
+
+        patch_jump(false_jump);
+
+        // False Path
+        emit_byte(OP_POP);
+    }
+
+    if (parse.previous.type == TOKEN_ELSE) {
         statement();
     }
 
-    patch_jump(else_jump);
+    for (int i = 0; i < end_jump_count; ++i) {
+        patch_jump(end_jumps[i]);
+    }
 }
 
 static void declaration() {
