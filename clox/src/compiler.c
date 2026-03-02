@@ -65,6 +65,8 @@ static void declaration();
 static void statement();
 static uint8_t identifier_constant(token* name);
 static int resolve_local(compiler* comp, token* name);
+static void and_(bool can_assign);
+static void or_(bool can_assign);
 
 static bytecode_chunk* current_chunk() {
     return compiling_chunk;
@@ -368,7 +370,7 @@ parse_rule rules[] = {
     [TOKEN_IDENTIFIER]    = {variable,   NULL,    PREC_NONE       },
     [TOKEN_STRING]        = {string,     NULL,    PREC_NONE       },
     [TOKEN_NUMBER]        = {number,     NULL,    PREC_NONE       },
-    [TOKEN_AND]           = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_AND]           = {NULL,       and_,    PREC_AND        },
     [TOKEN_CLASS]         = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_ELSE]          = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_FALSE]         = {literal,    NULL,    PREC_NONE       },
@@ -376,7 +378,7 @@ parse_rule rules[] = {
     [TOKEN_FUN]           = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_IF]            = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_NULL]          = {literal,    NULL,    PREC_NONE       },
-    [TOKEN_OR]            = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_OR]            = {NULL,       or_,     PREC_OR         },
     [TOKEN_PRINT]         = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_RETURN]        = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_SUPER]         = {NULL,       NULL,    PREC_NONE       },
@@ -489,6 +491,28 @@ static void mark_initialized() {
 static void define_global_variable(uint8_t global, bool is_const) {
     uint8_t instr = is_const ? OP_DEFINE_CONST_GLOBAL : OP_DEFINE_GLOBAL;
     emit_bytes2(instr, global);
+}
+
+static void and_(bool can_assign) {
+    // LHS has already been compiled and is on top of the stack.
+    // if it's false, we can safely skip over the rhs using lazy evaluation.
+    int end_jump = emit_jump(OP_JUMP_IF_FALSE);
+
+    // compile the RHS.
+    emit_byte(OP_POP);
+    parse_precedence(PREC_AND);
+
+    patch_jump(end_jump);
+}
+
+static void or_(bool can_assign) {
+    int else_jump = emit_jump(OP_JUMP_IF_FALSE);
+    int end_jump = emit_jump(OP_JUMP);
+    patch_jump(else_jump);
+
+    emit_byte(OP_POP);
+    parse_precedence(PREC_OR);
+    patch_jump(end_jump);
 }
 
 static parse_rule* get_rule(token_type type) {
