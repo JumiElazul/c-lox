@@ -637,6 +637,9 @@ static void expression_statement() {
     emit_byte(OP_POP);
 }
 
+static void for_statement() {
+}
+
 static void if_statement() {
 #define END_JUMP_MAX 256
     int end_jumps[END_JUMP_MAX];
@@ -711,6 +714,8 @@ static void statement() {
         debug_statement();
     } else if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_FOR)) {
+        for_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();
     } else if (matches_token(TOKEN_WHILE)) {
