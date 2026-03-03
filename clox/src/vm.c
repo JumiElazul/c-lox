@@ -140,6 +140,14 @@ static interpret_result run() {
             } break;
             case OP_DEFINE_CONST_GLOBAL: {
                 object_string* name = READ_STRING();
+
+                clox_value val;
+                bool exists = hash_table_get(&vm.const_globals, name, &val);
+                if (exists) {
+                    runtime_error("Const variable '%s' already defined.", name->chars);
+                    break;
+                }
+
                 hash_table_set(&vm.const_globals, name, peek_stack(0));
                 vm_stack_pop();
             } break;
