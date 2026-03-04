@@ -638,6 +638,61 @@ static void expression_statement() {
 }
 
 static void for_statement() {
+    begin_scope();
+
+    must_consume_token(TOKEN_LEFT_PAREN, "Expected '(' after 'for'.");
+
+    // Initializer clause
+    if (matches_token(TOKEN_SEMICOLON)) {
+        // No initializer
+    } else if (matches_token(TOKEN_CONST)) {
+        error("Variables marked 'const' cannot be used in 'for' statement initializer.");
+    } else if (matches_token(TOKEN_VAR)) {
+        variable_declaration(false);
+    } else {
+        expression_statement();
+    }
+
+    must_consume_token(TOKEN_SEMICOLON, "Expected ';'.");
+
+    int loop_start = current_chunk()->count;
+
+    // Condition clause
+    int exit_jump = -1;
+    if (!matches_token(TOKEN_SEMICOLON)) {
+        parse_expression();
+        must_consume_token(TOKEN_SEMICOLON, "Expected ';' after 'for' loop condition.");
+
+        exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+        emit_byte(OP_POP);
+    }
+
+    if (!matches_token(TOKEN_RIGHT_PAREN)) {
+        // Unconditionally jump over the increment expression the first time.
+        // Save where we are in the code for later jumping.
+        int body_jump = emit_jump(OP_JUMP);
+        int increment_start = current_chunk()->count;
+        parse_expression();
+        emit_byte(OP_POP);
+        must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after 'for' clauses.");
+
+        // Go back to the condition check.
+        emit_loop(loop_start);
+        loop_start = increment_start;
+        patch_jump(body_jump);
+    }
+
+    statement();
+    emit_loop(loop_start);
+
+    // If there's no condition clause, there is no jump to patch and no condition on the stack to
+    // pop.
+    if (exit_jump != -1) {
+        patch_jump(exit_jump);
+        emit_byte(OP_POP);
+    }
+
+    end_scope();
 }
 
 static void if_statement() {
