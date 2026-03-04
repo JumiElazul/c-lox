@@ -582,9 +582,11 @@ static void print_statement() {
 }
 
 static void break_statement() {
+    assert(false && "Unimplemented break_statement()");
 }
 
 static void continue_statement() {
+    assert(false && "Unimplemented continue_statement()");
 }
 
 static void while_statement() {
