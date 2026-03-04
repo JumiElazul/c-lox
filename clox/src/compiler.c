@@ -581,6 +581,12 @@ static void print_statement() {
     emit_byte(OP_PRINT);
 }
 
+static void break_statement() {
+}
+
+static void continue_statement() {
+}
+
 static void while_statement() {
     int loop_start = current_chunk()->count;
 
@@ -769,6 +775,10 @@ static void statement() {
         debug_statement();
     } else if (matches_token(TOKEN_PRINT)) {
         print_statement();
+    } else if (matches_token(TOKEN_BREAK)) {
+        break_statement();
+    } else if (matches_token(TOKEN_CONTINUE)) {
+        continue_statement();
     } else if (matches_token(TOKEN_FOR)) {
         for_statement();
     } else if (matches_token(TOKEN_IF)) {

@@ -109,16 +109,29 @@ static token_type check_keyword(int start, int length, const char* rest, token_t
 }
 
 static token_type identifier_type() {
+    int tok_len = (int)(lex.current - lex.start);
+
     switch (lex.start[0]) {
         case 'a':
             return check_keyword(1, 2, "nd", TOKEN_AND);
+        case 'b':
+            return check_keyword(1, 4, "reak", TOKEN_AND);
         case 'c':
-            if (lex.current - lex.start > 1) {
+            if (tok_len > 1) {
                 switch (lex.start[1]) {
                     case 'l':
                         return check_keyword(2, 3, "ass", TOKEN_CLASS);
-                    case 'o':
-                        return check_keyword(2, 3, "nst", TOKEN_CONST);
+                    case 'o': {
+                        if (tok_len == 5) {
+                            return check_keyword(2, 3, "nst", TOKEN_CONST);
+                        }
+
+                        if (tok_len == 8) {
+                            return check_keyword(2, 6, "ntinue", TOKEN_CONTINUE);
+                        }
+
+                        return TOKEN_IDENTIFIER;
+                    }
                 }
             }
             break;
@@ -127,7 +140,7 @@ static token_type identifier_type() {
         case 'e':
             return check_keyword(1, 3, "lse", TOKEN_ELSE);
         case 'f':
-            if (lex.current - lex.start > 1) {
+            if (tok_len > 1) {
                 switch (lex.start[1]) {
                     case 'a':
                         return check_keyword(2, 3, "lse", TOKEN_FALSE);
@@ -153,7 +166,7 @@ static token_type identifier_type() {
         case 's':
             return check_keyword(1, 4, "uper", TOKEN_SUPER);
         case 't':
-            if (lex.current - lex.start > 1) {
+            if (tok_len > 1) {
                 switch (lex.start[1]) {
                     case 'h':
                         return check_keyword(2, 2, "is", TOKEN_THIS);
