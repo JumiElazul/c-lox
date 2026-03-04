@@ -661,8 +661,6 @@ static void for_statement() {
         expression_statement();
     }
 
-    must_consume_token(TOKEN_SEMICOLON, "Expected ';'.");
-
     int loop_start = current_chunk()->count;
 
     // Condition clause
