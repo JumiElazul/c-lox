@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "bytecode_chunk.h"
 #include "object.h"
 #include "vm.h"
 #include <stdio.h>
@@ -20,6 +21,11 @@ void* reallocate(void* pointer, size_t old_size, size_t new_size) {
 
 static void free_object(object* obj) {
     switch (obj->type) {
+        case OBJECT_FUNCTION: {
+            object_function* function = (object_function*)obj;
+            free_bytecode_chunk(&function->chunk);
+            FREE(object_function, obj);
+        } break;
         case OBJECT_STRING: {
             object_string* string = (object_string*)obj;
             FREE_ARRAY(char, string->chars, string->length);

@@ -1,4 +1,5 @@
 #include "object.h"
+#include "bytecode_chunk.h"
 #include "hash_table.h"
 #include "memory.h"
 #include "vm.h"
@@ -14,6 +15,14 @@ static object* allocate_object(size_t size, object_type type) {
     obj->next = vm.objects;
     vm.objects = obj;
     return obj;
+}
+
+object_function* new_function() {
+    object_function* function = ALLOCATE_OBJECT(object_function, OBJECT_FUNCTION);
+    function->arity = 0;
+    function->name = NULL;
+    init_bytecode_chunk(&function->chunk);
+    return function;
 }
 
 static object_string* allocate_string(char* chars, size_t length, uint32_t hash) {
@@ -63,8 +72,19 @@ object_string* copy_string(const char* chars, size_t length) {
     return allocate_string(heap_chars, length, hash);
 }
 
+static void print_function(object_function* function) {
+    if (function->name == NULL) {
+        printf("<script>");
+        return;
+    }
+    printf("<func %s>", function->name->chars);
+}
+
 void print_object(clox_value value) {
     switch (OBJECT_TYPE(value)) {
+        case OBJECT_FUNCTION: {
+            print_function(AS_FUNCTION(value));
+        } break;
         case OBJECT_STRING: {
             printf("%s", AS_CSTRING(value));
         } break;

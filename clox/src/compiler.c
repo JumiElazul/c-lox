@@ -48,15 +48,22 @@ typedef struct {
     int depth;
 } local_variable;
 
+typedef enum {
+    TYPE_FUNCTION,
+    TYPE_SCRIPT,
+} function_type;
+
 typedef struct {
+    object_function* function;
+    function_type type;
+
     local_variable locals[UINT8_COUNT];
     int local_count;
     int scope_depth;
 } compiler;
 
 parser parse;
-compiler* current_comp = NULL;
-bytecode_chunk* compiling_chunk;
+compiler* current_compiler = NULL;
 
 static void parse_expression();
 static parse_rule* get_rule(token_type type);
@@ -69,7 +76,7 @@ static void and_(bool can_assign);
 static void or_(bool can_assign);
 
 static bytecode_chunk* current_chunk() {
-    return compiling_chunk;
+    return &current_compiler->function->chunk;
 }
 
 static void error_at(token* tok, const char* message) {
@@ -198,37 +205,51 @@ static void patch_jump(int offset) {
     }
 }
 
-static void init_compiler(compiler* comp) {
+static void init_compiler(compiler* comp, function_type type) {
+    comp->function = NULL;
+    comp->type = type;
     comp->local_count = 0;
     comp->scope_depth = 0;
-    current_comp = comp;
+    comp->function = new_function();
+    current_compiler = comp;
+
+    local_variable* local = &current_compiler->locals[current_compiler->local_count++];
+    local->depth = 0;
+    local->name.start = "";
+    local->name.length = 0;
 }
 
-static void end_compiler() {
+static object_function* end_compiler() {
     emit_return();
+    object_function* function = current_compiler->function;
+
 #ifdef DEBUG_PRINT_CODE
     if (!parse.had_error) {
-        disassemble_chunk(current_chunk(), "code");
+        disassemble_chunk(current_chunk(),
+                          function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
+
+    return function;
 }
 
 static void begin_scope() {
-    current_comp->scope_depth++;
+    current_compiler->scope_depth++;
 }
 
 static void end_scope() {
-    current_comp->scope_depth--;
+    current_compiler->scope_depth--;
 
-    while (current_comp->local_count > 0 &&
-           current_comp->locals[current_comp->local_count - 1].depth > current_comp->scope_depth) {
+    while (current_compiler->local_count > 0 &&
+           current_compiler->locals[current_compiler->local_count - 1].depth >
+               current_compiler->scope_depth) {
         emit_byte(OP_POP);
-        current_comp->local_count--;
+        current_compiler->local_count--;
     }
 }
 
 static bool is_local_scope() {
-    return current_comp->scope_depth > 0;
+    return current_compiler->scope_depth > 0;
 }
 
 static void binary(bool can_assign) {
@@ -309,7 +330,7 @@ static void named_variable(token name, bool can_assign, bool global_key) {
 
     int arg = -1;
     if (!global_key) {
-        arg = resolve_local(current_comp, &name);
+        arg = resolve_local(current_compiler, &name);
     }
 
     if (arg != -1) {
@@ -458,12 +479,12 @@ static int resolve_local(compiler* comp, token* name) {
 }
 
 static void add_local_variable(token name) {
-    if (current_comp->local_count >= UINT8_COUNT) {
+    if (current_compiler->local_count >= UINT8_COUNT) {
         error("Too many local variables in function.");
         return;
     }
 
-    local_variable* local = &current_comp->locals[current_comp->local_count++];
+    local_variable* local = &current_compiler->locals[current_compiler->local_count++];
     local->name = name;
     local->depth = -1;
 }
@@ -471,9 +492,9 @@ static void add_local_variable(token name) {
 static void declare_variable() {
     token* name = &parse.previous;
 
-    for (int i = current_comp->local_count - 1; i >= 0; --i) {
-        local_variable* local = &current_comp->locals[i];
-        if (local->depth != -1 && local->depth < current_comp->scope_depth) {
+    for (int i = current_compiler->local_count - 1; i >= 0; --i) {
+        local_variable* local = &current_compiler->locals[i];
+        if (local->depth != -1 && local->depth < current_compiler->scope_depth) {
             break;
         }
 
@@ -497,7 +518,8 @@ static uint8_t parse_variable(const char* err_message) {
 }
 
 static void mark_initialized() {
-    current_comp->locals[current_comp->local_count - 1].depth = current_comp->scope_depth;
+    current_compiler->locals[current_compiler->local_count - 1].depth =
+        current_compiler->scope_depth;
 }
 
 static void define_global_variable(uint8_t global, bool is_const) {
@@ -794,13 +816,12 @@ static void statement() {
     }
 }
 
-bool compile(const char* source, bytecode_chunk* chunk) {
+object_function* compile(const char* source) {
     init_lexer(source);
 
     compiler comp;
-    init_compiler(&comp);
+    init_compiler(&comp, TYPE_SCRIPT);
 
-    compiling_chunk = chunk;
     parse.had_error = false;
     parse.panic_mode = false;
 
@@ -810,6 +831,6 @@ bool compile(const char* source, bytecode_chunk* chunk) {
         declaration();
     }
 
-    end_compiler();
-    return !parse.had_error;
+    object_function* function = end_compiler();
+    return parse.had_error ? NULL : function;
 }
