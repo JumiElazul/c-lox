@@ -38,6 +38,7 @@ static void concatenate() {
 
 static void vm_reset_stack() {
     vm.sp = vm.stack;
+    vm.frame_count = 0;
 }
 
 static void runtime_error(const char* format, ...) {

@@ -1,14 +1,21 @@
 #ifndef CLOX_VM_H
 #define CLOX_VM_H
-#include "bytecode_chunk.h"
 #include "hash_table.h"
 #include "object.h"
 
-#define STACK_MAX 256
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
 typedef struct {
-    bytecode_chunk* chunk;
+    object_function* function;
     uint8_t* ip;
+    clox_value* slots;
+} stack_frame;
+
+typedef struct {
+    stack_frame frames[FRAMES_MAX];
+    int frame_count;
+
     clox_value stack[STACK_MAX];
     clox_value* sp;
     hash_table globals;
