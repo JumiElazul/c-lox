@@ -18,6 +18,72 @@ static clox_value peek_stack(int distance) {
     return vm.sp[-1 - distance];
 }
 
+static void vm_reset_stack() {
+    vm.sp = vm.stack;
+    vm.frame_count = 0;
+}
+
+static void print_stack_trace() {
+    fprintf(stderr, "== stack trace ==\n");
+
+    for (int i = vm.frame_count - 1; i >= 0; --i) {
+        stack_frame* frame = &vm.frames[i];
+        object_function* function = frame->function;
+        size_t instruction = frame->ip - function->chunk.code - 1;
+        fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+        if (function->name == NULL) {
+            fprintf(stderr, "script\n");
+        } else {
+            fprintf(stderr, "%s()\n", function->name->chars);
+        }
+    }
+}
+
+static void runtime_error(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fputs("\n", stderr);
+
+    print_stack_trace();
+
+    vm_reset_stack();
+}
+
+static bool call_function(object_function* function, int arg_count) {
+    if (arg_count != function->arity) {
+        runtime_error("Expected %d arguments for <func %s> but got %d.", function->arity,
+                      function->name->chars, arg_count);
+        return false;
+    }
+
+    if (vm.frame_count == FRAMES_MAX) {
+        runtime_error("== vm stack overflow ==");
+        return false;
+    }
+
+    stack_frame* frame = &vm.frames[vm.frame_count++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    frame->slots = vm.sp - arg_count - 1;
+    return true;
+}
+
+static bool call_value(clox_value callee, int arg_count) {
+    if (IS_OBJECT(callee)) {
+        switch (OBJECT_TYPE(callee)) {
+            case OBJECT_FUNCTION: {
+                return call_function(AS_FUNCTION(callee), arg_count);
+            } break;
+            default:
+                break;
+        }
+    }
+    runtime_error("Can only call functions and classes.");
+    return false;
+}
+
 static bool is_falsey(clox_value value) {
     return IS_NULL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
@@ -34,26 +100,6 @@ static void concatenate() {
 
     object_string* result = take_string(chars, length);
     vm_stack_push(OBJECT_VAL(result));
-}
-
-static void vm_reset_stack() {
-    vm.sp = vm.stack;
-    vm.frame_count = 0;
-}
-
-static void runtime_error(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    fputs("\n", stderr);
-
-    stack_frame* frame = &vm.frames[vm.frame_count - 1];
-    size_t instruction = frame->ip - frame->function->chunk.code - 1;
-    int line = frame->function->chunk.lines[instruction];
-
-    fprintf(stderr, "[line %d] in script\n", line);
-    vm_reset_stack();
 }
 
 void init_vm() {
@@ -246,9 +292,25 @@ static interpret_result run() {
                 uint16_t offset = READ_SHORT();
                 frame->ip -= offset;
             } break;
+            case OP_CALL: {
+                int arg_count = READ_BYTE();
+                if (!call_value(peek_stack(arg_count), arg_count)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
+            } break;
             case OP_RETURN: {
-                vm_stack_pop();
-                return INTERPRET_OK;
+                clox_value result = vm_stack_pop();
+                vm.frame_count--;
+
+                if (vm.frame_count == 0) {
+                    vm_stack_pop();
+                    return INTERPRET_OK;
+                }
+
+                vm.sp = frame->slots;
+                vm_stack_push(result);
+                frame = &vm.frames[vm.frame_count - 1];
             }
         }
     }
@@ -267,10 +329,7 @@ interpret_result interpret(const char* source) {
     }
 
     vm_stack_push(OBJECT_VAL(function));
-    stack_frame* frame = &vm.frames[vm.frame_count++];
-    frame->function = function;
-    frame->ip = frame->function->chunk.code;
-    frame->slots = vm.stack;
+    call_function(function, 0);
 
     return run();
 }

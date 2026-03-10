@@ -75,6 +75,7 @@ static uint8_t identifier_constant(token* name);
 static int resolve_local(compiler* comp, token* name);
 static void and_(bool can_assign);
 static void or_(bool can_assign);
+static uint8_t argument_list();
 
 static bytecode_chunk* current_chunk() {
     return &current_compiler->function->chunk;
@@ -175,6 +176,7 @@ static int emit_jump(uint8_t instruction) {
 }
 
 static void emit_return() {
+    emit_byte(OP_NULL);
     emit_byte(OP_RETURN);
 }
 
@@ -304,6 +306,11 @@ static void binary(bool can_assign) {
     }
 }
 
+static void call(bool can_assign) {
+    uint8_t arg_count = argument_list();
+    emit_bytes2(OP_CALL, arg_count);
+}
+
 static void literal(bool can_assign) {
     switch (parse.previous.type) {
         case TOKEN_FALSE: {
@@ -392,7 +399,7 @@ static void unary(bool can_assign) {
 
 // clang-format off
 parse_rule rules[] = {
-    [TOKEN_LEFT_PAREN]    = {grouping,   NULL,    PREC_NONE       },
+    [TOKEN_LEFT_PAREN]    = {grouping,   call,    PREC_NONE       },
     [TOKEN_RIGHT_PAREN]   = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_LEFT_BRACE]    = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_RIGHT_BRACE]   = {NULL,       NULL,    PREC_NONE       },
@@ -547,6 +554,23 @@ static void define_variable(uint8_t global, bool is_const) {
     emit_bytes2(instr, global);
 }
 
+static uint8_t argument_list() {
+    uint8_t arg_count = 0;
+
+    if (!check_token(TOKEN_RIGHT_PAREN)) {
+        do {
+            parse_expression();
+            if (arg_count == 255) {
+                error("Can't have more than 255 arguments in function call.");
+            }
+            ++arg_count;
+        } while (matches_token(TOKEN_COMMA));
+    }
+
+    must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after function arguments.");
+    return arg_count;
+}
+
 static void and_(bool can_assign) {
     // LHS has already been compiled and is on top of the stack.
     // if it's false, we can safely skip over the rhs using lazy evaluation.
@@ -603,6 +627,7 @@ static void compile_function(function_type type) {
         } while (matches_token(TOKEN_COMMA));
     }
 
+    must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after function parameters.");
     must_consume_token(TOKEN_LEFT_BRACE, "Expected '{' before function body.");
     block_statement();
 
@@ -648,6 +673,20 @@ static void print_statement() {
     must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' to close print statement.");
     must_consume_token(TOKEN_SEMICOLON, "Expected ';' after print statement closing.");
     emit_byte(OP_PRINT);
+}
+
+static void return_statement() {
+    if (current_compiler->type == TYPE_SCRIPT) {
+        error("Can't use a 'return' statement in top-level code.");
+    }
+
+    if (matches_token(TOKEN_SEMICOLON)) {
+        emit_return();
+    } else {
+        parse_expression();
+        must_consume_token(TOKEN_SEMICOLON, "Expected ';' after return value.");
+        emit_byte(OP_RETURN);
+    }
 }
 
 static void break_statement() {
@@ -854,6 +893,8 @@ static void statement() {
         for_statement();
     } else if (matches_token(TOKEN_IF)) {
         if_statement();
+    } else if (matches_token(TOKEN_RETURN)) {
+        return_statement();
     } else if (matches_token(TOKEN_WHILE)) {
         while_statement();
     } else if (matches_token(TOKEN_LEFT_BRACE)) {
