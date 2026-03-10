@@ -147,7 +147,7 @@ static token_type identifier_type() {
                     case 'o':
                         return check_keyword(2, 1, "r", TOKEN_FOR);
                     case 'u':
-                        return check_keyword(2, 1, "n", TOKEN_FUN);
+                        return check_keyword(2, 2, "nc", TOKEN_FUNC);
                 }
             }
             break;

@@ -53,7 +53,8 @@ typedef enum {
     TYPE_SCRIPT,
 } function_type;
 
-typedef struct {
+typedef struct compiler {
+    struct compiler* enclosing;
     object_function* function;
     function_type type;
 
@@ -206,12 +207,17 @@ static void patch_jump(int offset) {
 }
 
 static void init_compiler(compiler* comp, function_type type) {
+    comp->enclosing = current_compiler;
     comp->function = NULL;
     comp->type = type;
     comp->local_count = 0;
     comp->scope_depth = 0;
     comp->function = new_function();
     current_compiler = comp;
+
+    if (type != TYPE_SCRIPT) {
+        current_compiler->function->name = copy_string(parse.previous.start, parse.previous.length);
+    }
 
     local_variable* local = &current_compiler->locals[current_compiler->local_count++];
     local->depth = 0;
@@ -230,6 +236,7 @@ static object_function* end_compiler() {
     }
 #endif
 
+    current_compiler = current_compiler->enclosing;
     return function;
 }
 
@@ -246,6 +253,10 @@ static void end_scope() {
         emit_byte(OP_POP);
         current_compiler->local_count--;
     }
+}
+
+static bool is_global_scope() {
+    return current_compiler->scope_depth == 0;
 }
 
 static bool is_local_scope() {
@@ -408,7 +419,7 @@ parse_rule rules[] = {
     [TOKEN_ELSE]          = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_FALSE]         = {literal,    NULL,    PREC_NONE       },
     [TOKEN_FOR]           = {NULL,       NULL,    PREC_NONE       },
-    [TOKEN_FUN]           = {NULL,       NULL,    PREC_NONE       },
+    [TOKEN_FUNC]          = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_IF]            = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_NULL]          = {literal,    NULL,    PREC_NONE       },
     [TOKEN_OR]            = {NULL,       or_,     PREC_OR         },
@@ -518,11 +529,20 @@ static uint8_t parse_variable(const char* err_message) {
 }
 
 static void mark_initialized() {
+    if (is_global_scope()) {
+        return;
+    }
+
     current_compiler->locals[current_compiler->local_count - 1].depth =
         current_compiler->scope_depth;
 }
 
-static void define_global_variable(uint8_t global, bool is_const) {
+static void define_variable(uint8_t global, bool is_const) {
+    if (is_local_scope()) {
+        mark_initialized();
+        return;
+    }
+
     uint8_t instr = is_const ? OP_DEFINE_CONST_GLOBAL : OP_DEFINE_GLOBAL;
     emit_bytes2(instr, global);
 }
@@ -565,6 +585,38 @@ static void block_statement() {
     must_consume_token(TOKEN_RIGHT_BRACE, "Expected '}' after block statement.");
 }
 
+static void compile_function(function_type type) {
+    compiler comp;
+    init_compiler(&comp, TYPE_FUNCTION);
+    begin_scope();
+
+    must_consume_token(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
+
+    if (!check_token(TOKEN_RIGHT_PAREN)) {
+        do {
+            current_compiler->function->arity++;
+            if (current_compiler->function->arity > 255) {
+                error_at_current("Can't have more than 255 parameters in a function.");
+            }
+            uint8_t constant = parse_variable("Expected parameter name.");
+            define_variable(constant, false);
+        } while (matches_token(TOKEN_COMMA));
+    }
+
+    must_consume_token(TOKEN_LEFT_BRACE, "Expected '{' before function body.");
+    block_statement();
+
+    object_function* function = end_compiler();
+    emit_bytes2(OP_CONSTANT, make_constant(OBJECT_VAL(function)));
+}
+
+static void function_declaration() {
+    uint8_t global = parse_variable("Expected function name.");
+    mark_initialized();
+    compile_function(TYPE_FUNCTION);
+    define_variable(global, true);
+}
+
 static void variable_declaration(bool is_const) {
     uint8_t global = parse_variable("Expected variable name.");
 
@@ -579,12 +631,7 @@ static void variable_declaration(bool is_const) {
     }
 
     must_consume_token(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-
-    if (is_local_scope()) {
-        mark_initialized();
-    } else {
-        define_global_variable(global, is_const);
-    }
+    define_variable(global, is_const);
 }
 
 static void const_variable_declaration() {
@@ -646,7 +693,7 @@ static void synchronize() {
 
         switch (parse.current.type) {
             case TOKEN_CLASS:
-            case TOKEN_FUN:
+            case TOKEN_FUNC:
             case TOKEN_VAR:
             case TOKEN_FOR:
             case TOKEN_IF:
@@ -779,7 +826,9 @@ static void if_statement() {
 }
 
 static void declaration() {
-    if (matches_token(TOKEN_CONST)) {
+    if (matches_token(TOKEN_FUNC)) {
+        function_declaration();
+    } else if (matches_token(TOKEN_CONST)) {
         const_variable_declaration();
     } else if (matches_token(TOKEN_VAR)) {
         variable_declaration(false);
