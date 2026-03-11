@@ -810,58 +810,24 @@ static void for_statement() {
 }
 
 static void if_statement() {
-#define END_JUMP_MAX 256
-    int end_jumps[END_JUMP_MAX];
-    int end_jump_count = 0;
-
     must_consume_token(TOKEN_LEFT_PAREN, "Expected '(' after 'if'.");
     parse_expression();
     must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after 'if' condition.");
 
-    int false_jump = emit_jump(OP_JUMP_IF_FALSE);
+    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
 
-    // True path
     emit_byte(OP_POP);
     statement();
-    end_jumps[end_jump_count++] = emit_jump(OP_JUMP);
+    int else_jump = emit_jump(OP_JUMP);
 
-    patch_jump(false_jump);
-
-    // False path
+    patch_jump(then_jump);
     emit_byte(OP_POP);
 
-    // 'else if' cases
-    while (matches_token(TOKEN_ELSE) && matches_token(TOKEN_IF)) {
-        if (end_jump_count >= END_JUMP_MAX) {
-            error("Too many 'else if' cases in for statement.");
-            break;
-        }
-
-        must_consume_token(TOKEN_LEFT_PAREN, "Expected '(' after 'else if'.");
-        parse_expression();
-        must_consume_token(TOKEN_RIGHT_PAREN, "Expected ')' after 'else if' condition.");
-
-        false_jump = emit_jump(OP_JUMP_IF_FALSE);
-
-        // True path
-        emit_byte(OP_POP);
-        statement();
-        end_jumps[end_jump_count++] = emit_jump(OP_JUMP);
-
-        patch_jump(false_jump);
-
-        // False Path
-        emit_byte(OP_POP);
-    }
-
-    // Else case
-    if (parse.previous.type == TOKEN_ELSE) {
+    if (matches_token(TOKEN_ELSE)) {
         statement();
     }
 
-    for (int i = 0; i < end_jump_count; ++i) {
-        patch_jump(end_jumps[i]);
-    }
+    patch_jump(else_jump);
 }
 
 static void declaration() {

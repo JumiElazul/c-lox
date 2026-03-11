@@ -66,7 +66,7 @@ static bool call_function(object_function* function, int arg_count) {
     stack_frame* frame = &vm.frames[vm.frame_count++];
     frame->function = function;
     frame->ip = function->chunk.code;
-    frame->slots = vm.sp - arg_count - 1;
+    frame->stack_window = vm.sp - arg_count - 1;
     return true;
 }
 
@@ -173,11 +173,11 @@ static interpret_result run() {
             } break;
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                vm_stack_push(frame->slots[slot]);
+                vm_stack_push(frame->stack_window[slot]);
             } break;
             case OP_SET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                frame->slots[slot] = peek_stack(0);
+                frame->stack_window[slot] = peek_stack(0);
             } break;
             case OP_GET_GLOBAL: {
                 object_string* name = READ_STRING();
@@ -308,7 +308,7 @@ static interpret_result run() {
                     return INTERPRET_OK;
                 }
 
-                vm.sp = frame->slots;
+                vm.sp = frame->stack_window;
                 vm_stack_push(result);
                 frame = &vm.frames[vm.frame_count - 1];
             }

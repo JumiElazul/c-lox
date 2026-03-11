@@ -1,5 +1,24 @@
-func add(a, b) {
-    print(a + b);
+func thing(a) {
+    if (a == null) {
+        return null;
+    } else {
+        return a;
+    }
 }
 
-add(1, 2);
+var v1 = thing(null);
+var v2 = thing("string");
+
+if (!v1) {
+    print("v1 is null");
+} else {
+    print("v1 is not null:");
+    print(v1);
+}
+
+if (!v2) {
+    print("v2 is null");
+} else {
+    print("v2 is not null:");
+    print(v2);
+}

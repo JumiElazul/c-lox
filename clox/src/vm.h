@@ -9,7 +9,7 @@
 typedef struct {
     object_function* function;
     uint8_t* ip;
-    clox_value* slots;
+    clox_value* stack_window;
 } stack_frame;
 
 typedef struct {
