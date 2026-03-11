@@ -399,7 +399,7 @@ static void unary(bool can_assign) {
 
 // clang-format off
 parse_rule rules[] = {
-    [TOKEN_LEFT_PAREN]    = {grouping,   call,    PREC_NONE       },
+    [TOKEN_LEFT_PAREN]    = {grouping,   call,    PREC_CALL       },
     [TOKEN_RIGHT_PAREN]   = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_LEFT_BRACE]    = {NULL,       NULL,    PREC_NONE       },
     [TOKEN_RIGHT_BRACE]   = {NULL,       NULL,    PREC_NONE       },
