@@ -26,6 +26,9 @@ static void free_object(object* obj) {
             free_bytecode_chunk(&function->chunk);
             FREE(object_function, obj);
         } break;
+        case OBJECT_NATIVE: {
+            FREE(object_native, obj);
+        } break;
         case OBJECT_STRING: {
             object_string* string = (object_string*)obj;
             FREE_ARRAY(char, string->chars, string->length);

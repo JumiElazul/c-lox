@@ -76,6 +76,13 @@ static bool call_value(clox_value callee, int arg_count) {
             case OBJECT_FUNCTION: {
                 return call_function(AS_FUNCTION(callee), arg_count);
             } break;
+            case OBJECT_NATIVE: {
+                native_fn native = AS_NATIVE(callee);
+                clox_value result = native(arg_count, vm.sp - arg_count);
+                vm.sp -= arg_count + 1;
+                vm_stack_push(result);
+                return true;
+            } break;
             default:
                 break;
         }
